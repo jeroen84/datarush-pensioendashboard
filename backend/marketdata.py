@@ -18,6 +18,10 @@ SWAPTICKER = {"EUSA30":
               "Rente-Koers/61375432/IRS-30Y-30-360-ANN-6M-EURIBOR/"
               "historische-koersen.aspx?maand={}"}
 
+# create the log folder, in case it does not exist
+# the logging could crash in case the folder is not present
+os.makedirs("log", exist_ok=True)
+
 LOG.basicConfig(format='%(asctime)s %(message)s',
                 filename="log/backend.log",
                 level=LOG.INFO)

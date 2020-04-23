@@ -7,6 +7,11 @@ import os
 import logging as LOG
 
 DB_LOCATION = "db/marketdata.db"
+
+# create the log folder, in case it does not exist
+# the logging could crash in case the folder is not present
+os.makedirs("log", exist_ok=True)
+
 LOG.basicConfig(format='%(asctime)s %(message)s',
                 filename="log/backend.log",
                 level=LOG.INFO)

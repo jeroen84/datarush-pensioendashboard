@@ -3,7 +3,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
 from sklearn import linear_model
 import logging as LOG
+import os
 
+# create the log folder, in case it does not exist
+# the logging could crash in case the folder is not present
+os.makedirs("log", exist_ok=True)
 
 LOG.basicConfig(format='%(asctime)s %(message)s',
                 filename="log/riskmodel.log",
