@@ -1,0 +1,32 @@
+BEGIN TRANSACTION;
+CREATE TABLE IF NOT EXISTS "marketdata_names" (
+	"id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+	"short_name"	TEXT,
+	"long_name"	TEXT
+);
+CREATE TABLE IF NOT EXISTS "risicomodel" (
+	"id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+	"date"	TEXT,
+	"name"	TEXT,
+	"value"	REAL
+);
+CREATE TABLE IF NOT EXISTS "marketdata" (
+	"id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+	"date"	TEXT,
+	"name"	TEXT,
+	"value"	REAL
+);
+CREATE TABLE IF NOT EXISTS "dekkingsgraad" (
+	"id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+	"date"	TEXT,
+	"name"	TEXT,
+	"value"	REAL
+);
+CREATE TABLE IF NOT EXISTS "pensioenfondsen" (
+	"id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+	"name"	TEXT
+);
+CREATE INDEX IF NOT EXISTS "pf_index" ON "dekkingsgraad" (
+	"name"
+);
+COMMIT;

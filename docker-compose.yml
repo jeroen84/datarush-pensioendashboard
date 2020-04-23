@@ -1,0 +1,29 @@
+version: "3"
+
+services:
+
+  app:
+    build: .
+    container_name: pensioendashboard
+    restart: always
+    env_file: ${PWD}/.env/app.env
+    environment:
+      - TZ=Europe/Amsterdam
+    volumes:
+      - ${PWD}/db:/app/db
+      - ${PWD}/log:/app/log
+    ports:
+      - "8050:8050"
+    depends_on:
+      - backend
+  
+  backend:
+    build: ./backend
+    container_name: pensioenbackend
+    restart: "no"
+    env_file: ${PWD}/.env/backend.env
+    environment:
+      - TZ=Europe/Amsterdam
+    volumes:
+      - ${PWD}/db:/backend/db
+      - ${PWD}/log:/backend/log
