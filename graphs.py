@@ -59,7 +59,7 @@ class GraphLibrary:
                     [
                         dcc.Graph(
                             figure=figureDGR,
-                            responsive=True,
+                            responsive="auto",
                             config=graphConfig
                             )
                     ]}
@@ -70,7 +70,7 @@ class GraphLibrary:
                     [
                         dcc.Graph(
                             figure=figureEquity,
-                            responsive=True,
+                            responsive="auto",
                             config=graphConfig
                             )
                     ]}
@@ -81,7 +81,7 @@ class GraphLibrary:
                     [
                         dcc.Graph(
                             figure=figureRates,
-                            responsive=True,
+                            responsive="auto",
                             config=graphConfig
                             )
                     ]}

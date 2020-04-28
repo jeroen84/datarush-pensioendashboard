@@ -1,6 +1,6 @@
 # Pensioendashboard by Datarush
 
-Welcome to the repository of the [Pensioendashboard](http://pensioendashboard.datarush.nl). The dashboard provides insights in the financial health of the largest Dutch pension funds. The site is hosted by Microsoft Azure, using the Web App functionality.
+Welcome to the repository of the [Pensioendashboard](http://pensioendashboard.datarush.nl). The dashboard provides insights in the financial health of the largest Dutch pension funds. The site is hosted by Microsoft Azure, using the Web App functionality. Github commits are automatically deployed to the web site! :rocket:
 
 ---
 

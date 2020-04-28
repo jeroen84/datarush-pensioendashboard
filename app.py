@@ -40,6 +40,7 @@ _daterangeselector = dict(
                         ]),
                         bgcolor="red")
 RATES = ["EUSA30", "EURUSD"]
+TABINTERVALS = ["3m", "6m", "1y", "YTD", "all"]
 
 # initiate DataImport and RiskModelPF class
 DATA = DataImport()
@@ -57,15 +58,25 @@ NEWSAPI = NewsApiClient(api_key=NEWSAPI_KEY)
 
 
 def getNews():
-    return NEWSAPI.get_everything(q="pensioenfondsen",
-                                  language="nl",
-                                  sort_by="publishedAt",
-                                  page_size=10,
-                                  page=1)
+    topics = ["pensioenfondsen",
+              "beurs",
+              "rente",
+              "valuta"]
+
+    response = {}
+    for topic in topics:
+        response.update({topic:
+                         NEWSAPI.get_everything(q=topic,
+                                                language="nl",
+                                                sort_by="publishedAt",
+                                                page_size=10,
+                                                page=1)})
+
+    return response
 
 
-def buildNewsFeed():
-    results = getNews()
+def buildNewsFeed(topic):
+    results = getNews()[topic]
     news_items = [dbc.ListGroupItemHeading("Laatste nieuws [{}]".format(
         datetime.now().strftime("%H:%M:%S")
         ))]
@@ -77,6 +88,30 @@ def buildNewsFeed():
                                             href=item["url"],
                                             target="_blank"))
     return news_items
+
+
+def getMarketData():
+    # first refresh the dataset
+    DATA.refreshData()
+
+    # then run model
+    RISKMODEL.runLinearModel(DATA.df_marketdata, DATA.df_dgr)
+    RISKMODEL.makePrediction()
+    RISKMODEL.makeContribution()
+
+    # threading because otherwise not all graphs are completed
+    # at startup
+    thread = Thread(target=FIGURES.buildGraphs, args=(
+        DATA.df_dgr,
+        RISKMODEL.df_predict,
+        DATA.df_marketdata.dropna(),
+        DATA.df_marketdatanames,
+        RATES,
+        TABINTERVALS
+    ))
+
+    thread.start()
+    READY.wait()
 
 
 def buildCardLatestDGR(df_dgr, df_predict):
@@ -136,79 +171,14 @@ def buildCardLatestDGR(df_dgr, df_predict):
         )
 
 
-def tabContent(interval):
-
-    return [
-        dbc.Card(
-            dbc.CardBody(FIGURES.dgrgraphs[interval]),
-            id="dgr-graph-{}".format(interval)
-            ),
-        dbc.Card(
-            dbc.CardBody(FIGURES.equitygraphs[interval]),
-            id="equity-graph-{}".format(interval)
-            ),
-        dbc.Card(
-            dbc.CardBody(FIGURES.ratesgraphs[interval]),
-            id="rates-graph-{}".format(interval)
-            )
-    ]
-
-
-def buildTabs():
-    tabIntervals = ["3m", "6m", "1y", "YTD", "all"]
-    # first refresh the dataset
-    DATA.refreshData()
-
-    # then run model
-    RISKMODEL.runLinearModel(DATA.df_marketdata, DATA.df_dgr)
-    RISKMODEL.makePrediction()
-
-    latestDGRCards = buildCardLatestDGR(DATA.df_dgr,
-                                        RISKMODEL.df_predict)
-
-    # threading because otherwise not all graphs are completed
-    # at startup
-    thread = Thread(target=FIGURES.buildGraphs, args=(
-        DATA.df_dgr,
-        RISKMODEL.df_predict,
-        DATA.df_marketdata.dropna(),
-        DATA.df_marketdatanames,
-        RATES,
-        tabIntervals
-    ))
-
-    thread.start()
-    READY.wait()
-
-    dbcTabs = []
-    for interval in tabIntervals:
-        dbcTabs.append(dbc.Tab(
-            label=interval,
-            tab_id="tab-{}".format(interval)
-            )
-        )
-
-    # then return the content
-    return html.Div([
-        html.P([
-            html.Div(latestDGRCards),
-        ]),
-        html.P([
-            dbc.Tabs(
-                children=dbcTabs,
-                id="tabs",
-                active_tab="tab-{}".format(tabIntervals[0])
-            ),
-            html.Div(id="content")
-        ])
-    ])
-
+getMarketData()
+latestDGRCards = buildCardLatestDGR(DATA.df_dgr,
+                                    RISKMODEL.df_predict)
 
 # CONTENT OF THE SITE
-# sidebar
-sidebarContent = [
+aboutcontent = [
         dcc.Markdown("""
-        ### Welkom | Datarush
+        ### Over het pensioendashboard
 
         Dit dashboard geeft een overzicht van de actuele
         financiële stand van zaken van de grootste pensioenfondsen
@@ -220,66 +190,127 @@ sidebarContent = [
         toegepast. Qua software wordt gebruik gemaakt van onder meer
         Python, Azure Web Apps, Plotly en Dash. Dit alles in een volledig
         geautomatiseerde omgeving. De broncode is op
-        [Github](https://github.com/jeroen84/datarush-pensioendashboard) geplaatst!
+        [Github](https://github.com/jeroen84/datarush-pensioendashboard)
+        geplaatst!
         """.format("https://github.com/jeroen84/")
         ),
-
         dcc.Markdown("""
-        Klik op onderstaande button voor meer achtergrondinformatie over de
-        getoonde grafieken.
+        Dekkingsgraden worden slechts eenmaal per maand
+        gepubliceerd door de fondsen, en pas circa twee
+        weken na het einde van de maand. Dit dashboard
+        presenteert een inschatting van de dekkingsgraad
+        vanaf het laatst gepubliceerde cijfer. Voor de
+        inschatting wordt gebruik gemaakt van vijf
+        marktindicatoren, zie de tweede en derde grafiek.
+        Het aantal fondsen in het overzicht zal uitgebreid
+        worden.
         """),
-        html.P([
-            dbc.Button(
-                "Meer info",
-                id="meer-info-button"
-            ),
-            dbc.Collapse(
-                dbc.Card(dbc.CardBody(
-                    html.Div([
-                        dcc.Markdown("""
-                        Dekkingsgraden worden slechts eenmaal per maand
-                        gepubliceerd door de fondsen, en pas circa twee
-                        weken na het einde van de maand. Dit dashboard
-                        presenteert een inschatting van de dekkingsgraad
-                        vanaf het laatst gepubliceerde cijfer. Voor de
-                        inschatting wordt gebruik gemaakt van vijf
-                        marktindicatoren, zie de tweede en derde grafiek.
-                        Het aantal fondsen in het overzicht zal uitgebreid
-                        worden.
-                        """),
-                        dcc.Markdown("""
-                        De historische dekkingsgraden zijn verkregen van de
-                        websites van de pensioenfondsen. Voor de schatting
-                        van de dekkingsgraden wordt gebruik gemaakt van een
-                        lineair regressiemodel, waarbij test en training
-                        sets worden gebruikt. De schatting bevat
-                        statistisch gezien vele aannames en beperkingen.
-                        Afwijkingen ten opzichte van de gepubliceerde
-                        cijfers zullen er zijn. Daarom dienen de
-                        schattingen geïnterpreteerd te worden als een
-                        richting waarop de dekkingsgraden zich ontwikkelen.
-                        """)
-                    ]),
-                )
-                ),
-                id="meer-info-collapse"
-                )
-        ]),
-        html.P([
-            dbc.ListGroup(
-                id="update-news",
-                children=buildNewsFeed()
-                )
-        ])
+        dcc.Markdown("""
+        De historische dekkingsgraden zijn verkregen van de
+        websites van de pensioenfondsen. Voor de schatting
+        van de dekkingsgraden wordt gebruik gemaakt van een
+        lineair regressiemodel, waarbij test en training
+        sets worden gebruikt. De schatting bevat
+        statistisch gezien vele aannames en beperkingen.
+        Afwijkingen ten opzichte van de gepubliceerde
+        cijfers zullen er zijn. Daarom dienen de
+        schattingen geïnterpreteerd te worden als een
+        richting waarop de dekkingsgraden zich ontwikkelen.
+        """)
 ]
 
-sidebar = dbc.Col([
-    html.Div(
-        children=sidebarContent,
-        className="sidebar-div"
+topbar = dbc.Row([
+    dbc.Nav([
+        dbc.NavItem(dbc.NavLink("Contact",
+                                href="mailto:jeroen@datarush.nl")),
+        dbc.NavItem(dbc.NavLink(
+            "LinkedIn",
+            href="https://www.linkedin.com/in/jeroen-van-de-erve/")),
+        dbc.NavItem(dbc.NavLink(
+            "Github",
+            href="https://github.com/jeroen84/datarush-pensioendashboard")),
+        dbc.NavItem(dbc.NavLink("More",
+                                href="https://www.datarush.nl"))
+    ])
+])
+
+navbar = html.Div([
+    html.H2("Pensioendashboard"),
+    html.Hr(),
+    dbc.Nav([
+        dbc.NavItem(dbc.NavLink(
+            "Overzicht", href="/page-1", id="page-1-link")),
+        dbc.NavItem(dbc.NavLink(
+            "Pensioenfondsen", href="/page-2", id="page-2-link")),
+        dbc.NavItem(dbc.NavLink(
+            "Financiële markten", href="/page-3", id="page-3-link")),
+        dbc.NavItem(dbc.NavLink(
+            "Over", href="/page-4", id="page-4-link")),
+        ],
+        fill=True,
+        pills=True)
+])
+
+content = html.Div(id="page-content")
+
+contentOverview = html.Div([
+    html.P(latestDGRCards),
+    dbc.CardHeader(dbc.Tabs([
+        dbc.Tab(tab_id="tab-dgr", label="Dekkingsgraden"),
+        dbc.Tab(tab_id="tab-equity", label="Aandelen en grondstoffen"),
+        dbc.Tab(tab_id="tab-rates", label="Rente en valuta")
+    ],
+        id="tabs",
+        card=True,
+        active_tab="tab-dgr"),
     ),
-    ]
-)
+    html.Div(id="content")
+])
+
+contenttabs = {
+    "tab-dgr":
+    dbc.Row([
+                dbc.Col([
+                    dbc.Card(dbc.CardBody(FIGURES.dgrgraphs["6m"])),
+                ],
+                    lg=8,
+                    md=12
+                ),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody(buildNewsFeed("pensioenfondsen"))
+                    ])
+                ])
+            ]),
+    "tab-equity":
+    dbc.Row([
+                dbc.Col([
+                    dbc.Card(dbc.CardBody(FIGURES.equitygraphs["6m"]))
+                ],
+                    lg=8,
+                    md=12
+                ),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody(buildNewsFeed("beurs"))
+                    ])
+                ])
+            ]),
+    "tab-rates":
+    dbc.Row([
+                dbc.Col([
+                    dbc.Card(dbc.CardBody(FIGURES.ratesgraphs["6m"]))
+                ],
+                    lg=8,
+                    md=12
+                ),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody(buildNewsFeed("rente"))
+                    ])
+                ])
+            ]),
+}
 
 # set up the server, using a bootstrap theme
 dash_app = dash.Dash(
@@ -311,86 +342,52 @@ dash_app = dash.Dash(
     )
 
 app = dash_app.server
-
+dash_app.config.suppress_callback_exceptions = True
 # define the layout of the dashboard
 dash_app.title = "Datarush | Pensioendashboard"
-dash_app.layout = html.Div(children=[
-    dcc.Interval(
-        id="interval-news",
-        interval=30 * 60 * 1000,  # = 30 minutes
-        n_intervals=0
-        ),
-    dcc.Interval(
-        id="interval-graphs",
-        interval=60 * 60 * 1000,  # = 60 minutes
-        n_intervals=0
-    ),
-    dbc.Container(children=[
-        dbc.Row([
-            dbc.Nav([
-                dbc.NavItem(dbc.NavLink("Contact",
-                                        href="mailto:jeroen@datarush.nl")),
-                dbc.NavItem(dbc.NavLink(
-                    "LinkedIn",
-                    href="https://www.linkedin.com/in/jeroen-van-de-erve/")),
-                dbc.NavItem(dbc.NavLink(
-                    "Github",
-                    href="https://github.com/jeroen84/datarush-pensioendashboard")),
-                dbc.NavItem(dbc.NavLink("More",
-                                        href="https://www.datarush.nl")),
-            ])
-        ]),
-        dbc.Row([
-            dcc.Markdown([
-                "## Pensioendashboard"
-                ]),
-            ],
-            justify="center"
-            ),
-        dbc.Row(children=[
-            dbc.Col(id="update-graph-content",
-                    children=buildTabs(),
-                    xl=6,
-                    lg=8,
-                    md=12,
-                    sm=12,
-                    xs=12),
-            dbc.Col(id="sidebar-content",
-                    children=[sidebar])
-            ])
-        ],
-        fluid=False)
+dash_app.layout = dbc.Container([
+    dcc.Location(id="url"),
+    navbar,
+    content
 ])
 
 
-@dash_app.callback(Output("update-news", "children"),
-                   [Input("interval-news", "n_intervals")])
-def updateNewsFeed(n):
-    return buildNewsFeed()
-
-
-@dash_app.callback(Output("update-graph-content", "children"),
-                   [Input("interval-graphs", "n_intervals")])
-def updateDGRGraph(n):
-    return buildTabs()
-
-
-@dash_app.callback(Output("content", "children"), [Input("tabs",
-                                                         "active_tab")])
-def switch_tab(at):
-    interval = at[4:]
-    return tabContent(interval)
-
-
 @dash_app.callback(
-    Output("meer-info-collapse", "is_open"),
-    [Input("meer-info-button", "n_clicks")],
-    [State("meer-info-collapse", "is_open")],
+    [Output(f"page-{i}-link", "active") for i in range(1, 5)],
+    [Input("url", "pathname")],
 )
-def toggle_collapse(n, is_open):
-    if n:
-        return not is_open
-    return is_open
+def toggle_active_links(pathname):
+    if pathname == "/":
+        # Treat page 1 as the homepage / index
+        return True, False, False, False
+    return [pathname == f"/page-{i}" for i in range(1, 5)]
+
+
+@dash_app.callback(Output("page-content", "children"),
+                   [Input("url", "pathname")])
+def render_page_content(pathname):
+    if pathname in ["/", "/page-1"]:
+        return contentOverview
+    elif pathname == "/page-2":
+        return html.P("This is the content of page 2. Yay!")
+    elif pathname == "/page-3":
+        return html.P("This is the content of page 2. Yay!")
+    elif pathname == "/page-4":
+        return dbc.Jumbotron(aboutcontent)
+    # If the user tries to reach a different page, return a 404 message
+    return dbc.Jumbotron(
+        [
+            html.H1("404: Not found", className="text-danger"),
+            html.Hr(),
+            html.P(f"The pathname {pathname} was not recognised..."),
+        ]
+    )
+
+
+@dash_app.callback(Output("content", "children"),
+                   [Input("tabs", "active_tab")])
+def switch_tab(at):
+    return contenttabs[at]
 
 
 # run the dashboard

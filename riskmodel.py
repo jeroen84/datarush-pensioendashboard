@@ -168,6 +168,11 @@ class RiskModelPF:
                     ]
 
                 _df_input_firstrow = _df_input.iloc[:1]
+
+                # create blank dataframe for each fund, which is
+                # then added to the return dict per fund
+                _predict_values = pd.DataFrame(index=_df_input.index)
+
                 for riskfactor in _df_input.columns:
                     _df_input_contribution = _df_input.copy()
 
@@ -179,15 +184,17 @@ class RiskModelPF:
                         :, ~_df_input_firstrow.columns.isin([riskfactor])
                         ]
                     _df_input_contribution.ffill(inplace=True)
-
-                    _predict_values = self.regr_model[fund].predict(
+                    _predict = self.regr_model[fund].predict(
                         _df_input_contribution)
-
-                    _dfs_contribution.update({"{}_{}".format(fund, riskfactor):
-                                              pd.DataFrame(
-                                                  data=_predict_values,
+                    _predict_values = _predict_values.merge(right=pd.DataFrame(
+                                                  data=_predict,
                                                   index=_df_input.index,
-                                                  columns={"dekkingsgraad"})})
+                                                  columns={riskfactor}).diff(
+                                                  ).fillna(0),
+                                                  on="date")
+
+                # return the contributions as a df
+                _dfs_contribution.update({fund: _predict_values})
 
                 LOG.info("Succesfully made contribution values for {}".format(
                     fund))
