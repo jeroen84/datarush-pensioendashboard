@@ -1,5 +1,5 @@
 import dash
-from dash.dependencies import Input, Output, State
+from dash.dependencies import Input, Output
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
 import dash_html_components as html
@@ -269,11 +269,12 @@ topbar = dbc.Row([
             href="https://github.com/jeroen84/datarush-pensioendashboard")),
         dbc.NavItem(dbc.NavLink("More",
                                 href="https://www.datarush.nl"))
-    ])
-])
+    ]),
+],
+    justify="center")
 
 navbar = html.Div([
-    html.H2("Pensioendashboard"),
+    html.H2("Pensioendashboard", style={"textAlign": "center"}),
     html.Hr(),
     dbc.Nav([
         dbc.NavItem(dbc.NavLink(
@@ -355,6 +356,8 @@ dash_app.config.suppress_callback_exceptions = True
 dash_app.title = "Datarush | Pensioendashboard"
 dash_app.layout = dbc.Container([
     dcc.Location(id="url"),
+    topbar,
+    html.Hr(),
     navbar,
     content
 ])
@@ -377,9 +380,9 @@ def render_page_content(pathname):
     if pathname in ["/", "/page-1"]:
         return contentOverview
     elif pathname == "/page-2":
-        return html.P("This is the content of page 2. Yay!")
+        return dbc.Jumbotron(html.P("Work in progress..."))
     elif pathname == "/page-3":
-        return html.P("This is the content of page 2. Yay!")
+        return dbc.Jumbotron(html.P("Work in progress..."))
     elif pathname == "/page-4":
         return dbc.Jumbotron(aboutcontent)
     # If the user tries to reach a different page, return a 404 message
