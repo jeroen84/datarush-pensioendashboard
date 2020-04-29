@@ -11,6 +11,7 @@ from graphs import GraphLibrary
 from newsapi import NewsApiClient
 from threading import Event, Thread
 import os
+from flask_caching import Cache
 
 pio.templates.default = "ggplot2"
 
@@ -56,7 +57,43 @@ FIGURES = GraphLibrary(READY)
 NEWSAPI_KEY = os.environ["NEWSAPI_KEY"]
 NEWSAPI = NewsApiClient(api_key=NEWSAPI_KEY)
 
+# set up the server, using a bootstrap theme
+dash_app = dash.Dash(
+    __name__,
+    external_stylesheets=[dbc.themes.LUX],
+    meta_tags=[
+        {
+            "name": "description",
+            "content": "Actuele situatie van Nederlandse pensioenfondsen"
+                       "in een overzichtelijk dashboard"
+        },
+        {
+            "name": "keywords",
+            "content": "dekkingsgraad, pensioenfondsen, dashboard, datarush"
+        },
+        {
+            "name": "author",
+            "content": "Jeroen van de Erve"
+        },
+        {
+            "name": "viewport",
+            "content": "width=device-width, initial-scale=1.0"
+        },
+        {
+            "http-equiv": "X-UA-Compatible",
+            "content": "IE=edge"
+        },
+    ]
+    )
+app = dash_app.server
+cache = Cache(app, config={
+    "CACHE_TYPE": "filesystem",
+    "CACHE_DIR": "cache-directory"
+})
+CACHE_TIMEOUT = 600
 
+
+@cache.memoize(timeout=CACHE_TIMEOUT)
 def getNews():
     topics = ["pensioenfondsen",
               "beurs",
@@ -90,6 +127,7 @@ def buildNewsFeed(topic):
     return news_items
 
 
+@cache.memoize(timeout=CACHE_TIMEOUT)
 def getMarketData():
     # first refresh the dataset
     DATA.refreshData()
@@ -312,36 +350,6 @@ contenttabs = {
             ]),
 }
 
-# set up the server, using a bootstrap theme
-dash_app = dash.Dash(
-    __name__,
-    external_stylesheets=[dbc.themes.LUX],
-    meta_tags=[
-        {
-            "name": "description",
-            "content": "Actuele situatie van Nederlandse pensioenfondsen"
-                       "in een overzichtelijk dashboard"
-        },
-        {
-            "name": "keywords",
-            "content": "dekkingsgraad, pensioenfondsen, dashboard, datarush"
-        },
-        {
-            "name": "author",
-            "content": "Jeroen van de Erve"
-        },
-        {
-            "name": "viewport",
-            "content": "width=device-width, initial-scale=1.0"
-        },
-        {
-            'http-equiv': 'X-UA-Compatible',
-            'content': 'IE=edge'
-        },
-    ]
-    )
-
-app = dash_app.server
 dash_app.config.suppress_callback_exceptions = True
 # define the layout of the dashboard
 dash_app.title = "Datarush | Pensioendashboard"
