@@ -10,6 +10,31 @@ LINECOLORS = {"ABP": "indianred",
               "BPF Bouw": "goldenrod",
               "PMT": "black"}
 
+RANGESELECTOR = dict(
+    buttons=list([
+        dict(count=1,
+             label="1m",
+             step="month",
+             stepmode="backward"),
+        dict(count=3,
+             label="3m",
+             step="month",
+             stepmode="backward"),
+        dict(count=6,
+             label="6m",
+             step="month",
+             stepmode="backward"),
+        dict(count=1,
+             label="1y",
+             step="year",
+             stepmode="backward"),
+        dict(count=1,
+             label="YTD",
+             step="year",
+             stepmode="todate"),
+        dict(step="all")
+    ]))
+
 
 class GraphLibrary:
 
@@ -18,23 +43,26 @@ class GraphLibrary:
         self.dgrgraphs = {}
         self.equitygraphs = {}
         self.ratesgraphs = {}
+        self.contributiongraphs = {}
+        self.graphConfig = {"displayModeBar": False}
 
     def buildGraphs(self,
                     df_dgr: pd.DataFrame,
                     df_predict: pd.DataFrame,
                     df_marketdata: pd.DataFrame,
                     df_marketdatanames: pd.DataFrame,
+                    df_contribution: pd.DataFrame,
                     rates_indices: list,
                     intervals: list):
         self.df_dgr = df_dgr
         self.df_predict = df_predict
         self.df_marketdata = df_marketdata
         self.df_marketdatanames = df_marketdatanames
+        self.df_contribution = df_contribution
         self.rates_indices = rates_indices
         self.intervals = intervals
 
         _today = datetime.now()
-        graphConfig = {"displayModeBar": False}
 
         for interval in self.intervals:
             if interval == "3m":
@@ -53,6 +81,7 @@ class GraphLibrary:
             figureDGR = self.buildDGRGraph(_startdate)
             figureEquity = self.buildEquityGraph(_startdate)
             figureRates = self.buildRatesGraph(_startdate)
+            figureContribution = self.buildContributionGraph("ABP")
 
             self.dgrgraphs.update(
                 {interval:
@@ -60,7 +89,7 @@ class GraphLibrary:
                         dcc.Graph(
                             figure=figureDGR,
                             responsive="auto",
-                            config=graphConfig
+                            config=self.graphConfig
                             )
                     ]}
                 )
@@ -71,7 +100,7 @@ class GraphLibrary:
                         dcc.Graph(
                             figure=figureEquity,
                             responsive="auto",
-                            config=graphConfig
+                            config=self.graphConfig
                             )
                     ]}
                 )
@@ -82,7 +111,18 @@ class GraphLibrary:
                         dcc.Graph(
                             figure=figureRates,
                             responsive="auto",
-                            config=graphConfig
+                            config=self.graphConfig
+                            )
+                    ]}
+                )
+
+            self.contributiongraphs.update(
+                {interval:
+                    [
+                        dcc.Graph(
+                            figure=figureContribution,
+                            responsive="auto",
+                            config=self.graphConfig
                             )
                     ]}
                 )
@@ -198,3 +238,50 @@ class GraphLibrary:
                                 legend_orientation="h")
 
         return fig_rates
+
+    def buildContributionGraph(self, fund):
+        fig_contr = make_subplots(specs=[[{"secondary_y": True}]])
+
+        hovertemplatebar = "<b>Datum:</b> %{x}<br><br>" \
+                           "<b>Impact op dekkingsgraad:</b> %{y:.2f}%<br>" \
+                           "t.o.v. de vorige dag"
+
+        hovertemplatepredict = "<b>Datum:</b> %{x}<br><br>" \
+                               "<b>Dekkingsgraad:</b> %{y:.1f}%<br>"
+
+        df_contribution_fund = self.df_contribution[fund]
+        # add prediction line
+
+        for column in df_contribution_fund.columns:
+            _x = df_contribution_fund.index
+            _y = df_contribution_fund[column]
+            long_name = self.df_marketdatanames[column]
+
+            fig_contr.add_trace(go.Bar(x=_x,
+                                       y=_y,
+                                       hovertemplate=hovertemplatebar,
+                                       name=long_name),
+                                secondary_y=False)
+        # add prediction line
+        df_predict_fund = self.df_predict[fund]
+
+        fig_contr.add_trace(go.Scatter(x=df_predict_fund.index,
+                                       y=df_predict_fund["dekkingsgraad"],
+                                       hovertemplate=hovertemplatepredict,
+                                       line=dict(dash="dash",
+                                                 width=3,
+                                                 color=LINECOLORS[fund]),
+                                       name="{} schatting".format(fund),
+                                       showlegend=False),
+                            secondary_y=True)
+
+        fig_contr.update_layout(xaxis_rangeslider_visible=False,
+                                title="Wat verklaart het verloop van dekkingsgraad?",
+                                barmode="relative",
+                                legend_orientation="h")
+        fig_contr.update_xaxes(
+            rangebreaks=[
+                dict(bounds=["sat", "mon"])
+            ]
+        )
+        return fig_contr

@@ -13,35 +13,10 @@ from threading import Event, Thread
 import os
 from flask_caching import Cache
 
-pio.templates.default = "ggplot2"
+pio.templates.default = "seaborn"
 
-_daterangeselector = dict(
-                        buttons=list([
-                            dict(count=1,
-                                 label="1m",
-                                 step="month",
-                                 stepmode="backward"),
-                            dict(count=3,
-                                 label="3m",
-                                 step="month",
-                                 stepmode="backward"),
-                            dict(count=6,
-                                 label="6m",
-                                 step="month",
-                                 stepmode="backward"),
-                            dict(count=1,
-                                 label="1y",
-                                 step="year",
-                                 stepmode="backward"),
-                            dict(count=1,
-                                 label="YTD",
-                                 step="year",
-                                 stepmode="todate"),
-                            dict(step="all")
-                        ]),
-                        bgcolor="red")
 RATES = ["EUSA30", "EURUSD"]
-TABINTERVALS = ["3m", "6m", "1y", "YTD", "all"]
+TABINTERVALS = ["6m"]
 
 # initiate DataImport and RiskModelPF class
 DATA = DataImport()
@@ -144,6 +119,7 @@ def getMarketData():
         RISKMODEL.df_predict,
         DATA.df_marketdata.dropna(),
         DATA.df_marketdatanames,
+        RISKMODEL.df_contribution,
         RATES,
         TABINTERVALS
     ))
@@ -292,7 +268,7 @@ navbar = html.Div([
 
 content = html.Div(id="page-content")
 
-contentOverview = html.Div([
+contentoverview = html.Div([
     html.P(latestDGRCards),
     dbc.CardHeader(dbc.Tabs([
         dbc.Tab(tab_id="tab-dgr", label="Dekkingsgraden"),
@@ -305,6 +281,30 @@ contentOverview = html.Div([
     ),
     html.Div(id="content")
 ])
+
+contentpensioenfondsen = [
+    dbc.Row(
+        dbc.Col(
+        dbc.Card(
+            dbc.CardBody(
+                dcc.Dropdown(
+                    id="fund-name-dropdown",
+                    options=[
+                        {"label": fund, "value": fund} for fund in RISKMODEL.df_contribution.keys()
+                    ],
+                    value="ABP",
+                )
+            ))
+        )
+    ),
+    dbc.Row(
+        dbc.Col(
+        dbc.Card(
+            dbc.CardBody(
+                dcc.Graph(id="contribution-graph")))
+        )
+    )
+]
 
 contenttabs = {
     "tab-dgr":
@@ -378,9 +378,9 @@ def toggle_active_links(pathname):
                    [Input("url", "pathname")])
 def render_page_content(pathname):
     if pathname in ["/", "/page-1"]:
-        return contentOverview
+        return contentoverview
     elif pathname == "/page-2":
-        return dbc.Jumbotron(html.P("Work in progress..."))
+        return contentpensioenfondsen
     elif pathname == "/page-3":
         return dbc.Jumbotron(html.P("Work in progress..."))
     elif pathname == "/page-4":
@@ -399,6 +399,16 @@ def render_page_content(pathname):
                    [Input("tabs", "active_tab")])
 def switch_tab(at):
     return contenttabs[at]
+
+
+@dash_app.callback(
+    Output("contribution-graph", "figure"),
+    [
+        Input("fund-name-dropdown", "value")
+    ],
+)
+def makeContributionGraph(fund):
+    return FIGURES.buildContributionGraph(fund)
 
 
 # run the dashboard
