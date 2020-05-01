@@ -21,7 +21,6 @@ TABINTERVALS = ["6m"]
 # initiate DataImport and RiskModelPF class
 DATA = DataImport()
 RISKMODEL = RiskModelPF()
-TABCONTENTDICT = {}  # this is used to pre-calculate all the graphs
 
 # for threadign purposes
 READY = Event()
@@ -68,7 +67,6 @@ cache = Cache(app, config={
 CACHE_TIMEOUT = 600
 
 
-@cache.memoize(timeout=CACHE_TIMEOUT)
 def getNews():
     topics = ["pensioenfondsen",
               "beurs",
@@ -102,7 +100,6 @@ def buildNewsFeed(topic):
     return news_items
 
 
-@cache.memoize(timeout=CACHE_TIMEOUT)
 def getMarketData():
     # first refresh the dataset
     DATA.refreshData()
@@ -185,10 +182,6 @@ def buildCardLatestDGR(df_dgr, df_predict):
         )
 
 
-getMarketData()
-latestDGRCards = buildCardLatestDGR(DATA.df_dgr,
-                                    RISKMODEL.df_predict)
-
 # CONTENT OF THE SITE
 aboutcontent = [
         dcc.Markdown("""
@@ -267,89 +260,103 @@ navbar = html.Div([
 ])
 
 content = html.Div(id="page-content")
+# --------------
 
-contentoverview = html.Div([
-    html.P(latestDGRCards),
-    dbc.CardHeader(dbc.Tabs([
-        dbc.Tab(tab_id="tab-dgr", label="Dekkingsgraden"),
-        dbc.Tab(tab_id="tab-equity", label="Aandelen en grondstoffen"),
-        dbc.Tab(tab_id="tab-rates", label="Rente en valuta")
-    ],
-        id="tabs",
-        card=True,
-        active_tab="tab-dgr"),
-    ),
-    html.Div(id="content")
-])
 
-contentpensioenfondsen = [
-    dbc.Row(
-        dbc.Col(
-        dbc.Card(
-            dbc.CardBody(
-                dcc.Dropdown(
-                    id="fund-name-dropdown",
-                    options=[
-                        {"label": fund, "value": fund} for fund in RISKMODEL.df_contribution.keys()
-                    ],
-                    value="ABP",
+@cache.memoize(timeout=CACHE_TIMEOUT)
+def contentoverview():
+    getMarketData()
+    latestDGRCards = buildCardLatestDGR(DATA.df_dgr,
+                                        RISKMODEL.df_predict)
+
+    return html.Div([
+        html.P(latestDGRCards),
+        dbc.CardHeader(dbc.Tabs([
+            dbc.Tab(tab_id="tab-dgr", label="Dekkingsgraden"),
+            dbc.Tab(tab_id="tab-equity", label="Aandelen en grondstoffen"),
+            dbc.Tab(tab_id="tab-rates", label="Rente en valuta")
+        ],
+            id="tabs",
+            card=True,
+            active_tab="tab-dgr"),
+        ),
+        html.Div(id="content")
+    ])
+
+
+@cache.memoize(timeout=CACHE_TIMEOUT)
+def contentpensioenfondsen():
+    return [
+        dbc.Row(
+            dbc.Col(
+                dbc.Card(
+                    dbc.CardBody(
+                        dcc.Dropdown(
+                            id="fund-name-dropdown",
+                            options=[
+                                {"label": fund, "value": fund}
+                                for fund in RISKMODEL.df_contribution.keys()
+                            ],
+                            value="ABP",
+                        )
+                    ))
+            )
+        ),
+        dbc.Row(
+            dbc.Col(
+                dbc.Card(
+                    dbc.CardBody(
+                        dcc.Graph(id="contribution-graph")))
                 )
-            ))
         )
-    ),
-    dbc.Row(
-        dbc.Col(
-        dbc.Card(
-            dbc.CardBody(
-                dcc.Graph(id="contribution-graph")))
-        )
-    )
-]
+    ]
 
-contenttabs = {
-    "tab-dgr":
-    dbc.Row([
-                dbc.Col([
-                    dbc.Card(dbc.CardBody(FIGURES.dgrgraphs["6m"])),
-                ],
-                    lg=8,
-                    md=12
-                ),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody(buildNewsFeed("pensioenfondsen"))
-                    ])
+
+@cache.memoize(timeout=CACHE_TIMEOUT)
+def contenttabs(tab):
+    if tab == "tab-dgr":
+        return dbc.Row([
+            dbc.Col([
+                dbc.Card(dbc.CardBody(FIGURES.dgrgraphs["6m"])),
+            ],
+                lg=8,
+                md=12
+            ),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody(buildNewsFeed("pensioenfondsen"))
                 ])
-            ]),
-    "tab-equity":
-    dbc.Row([
-                dbc.Col([
-                    dbc.Card(dbc.CardBody(FIGURES.equitygraphs["6m"]))
-                ],
-                    lg=8,
-                    md=12
-                ),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody(buildNewsFeed("beurs"))
-                    ])
+            ])
+        ])
+    elif tab == "tab-equity":
+        return dbc.Row([
+            dbc.Col([
+                dbc.Card(dbc.CardBody(FIGURES.equitygraphs["6m"]))
+            ],
+                lg=8,
+                md=12
+            ),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody(buildNewsFeed("beurs"))
                 ])
-            ]),
-    "tab-rates":
-    dbc.Row([
-                dbc.Col([
-                    dbc.Card(dbc.CardBody(FIGURES.ratesgraphs["6m"]))
-                ],
-                    lg=8,
-                    md=12
-                ),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody(buildNewsFeed("rente"))
-                    ])
+            ])
+        ])
+    elif tab == "tab-rates":
+        return dbc.Row([
+            dbc.Col([
+                dbc.Card(dbc.CardBody(FIGURES.ratesgraphs["6m"]))
+            ],
+                lg=8,
+                md=12
+            ),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody(buildNewsFeed("rente"))
                 ])
-            ]),
-}
+            ])
+        ])
+
 
 dash_app.config.suppress_callback_exceptions = True
 # define the layout of the dashboard
@@ -378,9 +385,9 @@ def toggle_active_links(pathname):
                    [Input("url", "pathname")])
 def render_page_content(pathname):
     if pathname in ["/", "/page-1"]:
-        return contentoverview
+        return contentoverview()
     elif pathname == "/page-2":
-        return contentpensioenfondsen
+        return contentpensioenfondsen()
     elif pathname == "/page-3":
         return dbc.Jumbotron(html.P("Work in progress..."))
     elif pathname == "/page-4":
@@ -398,7 +405,7 @@ def render_page_content(pathname):
 @dash_app.callback(Output("content", "children"),
                    [Input("tabs", "active_tab")])
 def switch_tab(at):
-    return contenttabs[at]
+    return contenttabs(at)
 
 
 @dash_app.callback(

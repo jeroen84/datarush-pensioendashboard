@@ -276,7 +276,8 @@ class GraphLibrary:
                             secondary_y=True)
 
         fig_contr.update_layout(xaxis_rangeslider_visible=False,
-                                title="Wat verklaart het verloop van dekkingsgraad?",
+                                title="Wat verklaart het verloop "
+                                      "van dekkingsgraad?",
                                 barmode="relative",
                                 legend_orientation="h")
         fig_contr.update_xaxes(
