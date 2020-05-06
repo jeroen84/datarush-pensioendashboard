@@ -81,7 +81,7 @@ class GraphLibrary:
             figureDGR = self.buildDGRGraph(_startdate)
             figureEquity = self.buildEquityGraph(_startdate)
             figureRates = self.buildRatesGraph(_startdate)
-            figureContribution = self.buildContributionGraph("ABP")
+            # figureContribution = self.buildContributionGraph("ABP")
 
             self.dgrgraphs.update(
                 {interval:
@@ -116,16 +116,16 @@ class GraphLibrary:
                     ]}
                 )
 
-            self.contributiongraphs.update(
-                {interval:
-                    [
-                        dcc.Graph(
-                            figure=figureContribution,
-                            responsive="auto",
-                            config=self.graphConfig
-                            )
-                    ]}
-                )
+            # self.contributiongraphs.update(
+            #     {interval:
+            #         [
+            #             dcc.Graph(
+            #                 figure=figureContribution,
+            #                 responsive="auto",
+            #                 config=self.graphConfig
+            #                 )
+            #         ]}
+            #     )
 
         self.ready.set()
 
@@ -239,7 +239,7 @@ class GraphLibrary:
 
         return fig_rates
 
-    def buildContributionGraph(self, fund):
+    def buildContributionGraph(self, fund, bin=None):
         fig_contr = make_subplots(specs=[[{"secondary_y": True}]])
 
         hovertemplatebar = "<b>Datum:</b> %{x}<br><br>" \
@@ -250,7 +250,11 @@ class GraphLibrary:
                                "<b>Dekkingsgraad:</b> %{y:.1f}%<br>"
 
         df_contribution_fund = self.df_contribution[fund]
-        # add prediction line
+
+        if bin is not None:
+            df_contribution_fund = df_contribution_fund.groupby(
+                pd.Grouper(level="date", freq=bin)
+            ).sum()
 
         for column in df_contribution_fund.columns:
             _x = df_contribution_fund.index
@@ -265,6 +269,20 @@ class GraphLibrary:
         # add prediction line
         df_predict_fund = self.df_predict[fund]
 
+        # only show the prediction values that are equal to the bins
+        if bin is not None:
+            # WORKAROUND: given that the latest predict date could be
+            # before the last date of the bin, change the date of the
+            # last value of the prediction equal to the last date value
+            # of the bin
+            _idx = df_predict_fund.index.to_list()
+            _idx[-1] = max(df_contribution_fund.index)
+            df_predict_fund.index = _idx
+
+            df_predict_fund = df_predict_fund[
+                df_predict_fund.index.isin(df_contribution_fund.index)
+            ]
+
         fig_contr.add_trace(go.Scatter(x=df_predict_fund.index,
                                        y=df_predict_fund["dekkingsgraad"],
                                        hovertemplate=hovertemplatepredict,
@@ -277,8 +295,9 @@ class GraphLibrary:
 
         fig_contr.update_layout(xaxis_rangeslider_visible=False,
                                 title="Wat verklaart het verloop "
-                                      "van dekkingsgraad?",
+                                      "van de dekkingsgraad ({})?".format(fund),
                                 barmode="relative",
+                                bargap=0,
                                 legend_orientation="h")
         fig_contr.update_xaxes(
             rangebreaks=[

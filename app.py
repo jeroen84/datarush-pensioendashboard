@@ -65,6 +65,7 @@ cache = Cache(app, config={
     "CACHE_DIR": "cache-directory"
 })
 CACHE_TIMEOUT = 600
+cache.clear()
 
 
 def getNews():
@@ -289,7 +290,23 @@ def contentpensioenfondsen():
     return [
         dbc.Row(
             dbc.Col(
-                dbc.Card(
+                dbc.Card([
+                    dbc.CardHeader("Toelichting"),
+                    dbc.CardBody("Onderstaand grafiek geeft per tijdshorizon, "
+                                 "bijvoorbeeld per dag, de impact van de "
+                                 "de risicofactoren aandelen, grondstoffen, "
+                                 "valuta en rente op de verandering van de "
+                                 "geschatte dekkingsgraad weer. Merk op, dit "
+                                 "betreft alleen de periode waarover de "
+                                 "dekkingsgraad geschat wordt."
+                                 )
+                ])
+            ),
+        ),
+        dbc.Row([
+            dbc.Col(
+                dbc.Card([
+                    dbc.CardHeader("Fonds"),
                     dbc.CardBody(
                         dcc.Dropdown(
                             id="fund-name-dropdown",
@@ -299,14 +316,42 @@ def contentpensioenfondsen():
                             ],
                             value="ABP",
                         )
-                    ))
+                    )
+                ]
+
+                    ),
+                lg=6,
+                md=12
+            ),
+            dbc.Col(
+                dbc.Card([
+                    dbc.CardHeader("Tijdshorizon"),
+                    dbc.CardBody(
+                            dcc.Dropdown(
+                                id="bin-dropdown",
+                                options=[
+                                    {"label": "1 dag", "value": "D"},
+                                    {"label": "1 week", "value": "W-FRI"}
+                                ],
+                                value="D"
+                            )
+                    )
+                ]
+                    )
             )
+        ],
+            no_gutters=True
         ),
         dbc.Row(
             dbc.Col(
                 dbc.Card(
                     dbc.CardBody(
-                        dcc.Graph(id="contribution-graph")))
+                        dcc.Loading(id="loading-icon",
+                                    children=dcc.Graph(
+                                        id="contribution-graph",
+                                        responsive="auto",
+                                        config=FIGURES.graphConfig),
+                                    type="default")))
                 )
         )
     ]
@@ -411,11 +456,12 @@ def switch_tab(at):
 @dash_app.callback(
     Output("contribution-graph", "figure"),
     [
-        Input("fund-name-dropdown", "value")
+        Input("fund-name-dropdown", "value"),
+        Input("bin-dropdown", "value")
     ],
 )
-def makeContributionGraph(fund):
-    return FIGURES.buildContributionGraph(fund)
+def makeContributionGraph(fund, bin):
+    return FIGURES.buildContributionGraph(fund, bin)
 
 
 # run the dashboard
