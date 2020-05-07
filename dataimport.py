@@ -16,6 +16,7 @@ class DataImport:
         self.df_marketdata = self.loadMarketData()
         self.df_dgr = self.loadDekkingsgraden()
         self.df_marketdatanames = self.loadMarketDataNames()
+        self.df_countryexposure = self.loadCountryExposure()
 
     def startConnection(self):
         self.engine = create_engine("sqlite:///{}".format(self.source))
@@ -44,6 +45,13 @@ class DataImport:
                                 "value": "dekkingsgraad"}, inplace=True)
 
         return _df_dgr
+
+    def loadCountryExposure(self) -> pd.DataFrame:
+        _query = "SELECT * FROM country_exposures"
+        _df = pd.read_sql(_query, self.engine, index_col="date",
+                          parse_dates={"date", "%Y-%m-%d"})
+
+        return _df
 
     def closeConnection(self):
         pass

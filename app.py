@@ -118,6 +118,7 @@ def getMarketData():
         DATA.df_marketdata.dropna(),
         DATA.df_marketdatanames,
         RISKMODEL.df_contribution,
+        DATA.df_countryexposure,
         RATES,
         TABINTERVALS
     ))
@@ -250,9 +251,9 @@ navbar = html.Div([
         dbc.NavItem(dbc.NavLink(
             "Overzicht", href="/page-1", id="page-1-link")),
         dbc.NavItem(dbc.NavLink(
-            "Pensioenfondsen", href="/page-2", id="page-2-link")),
+            "Dekkingsgraadcontributie", href="/page-2", id="page-2-link")),
         dbc.NavItem(dbc.NavLink(
-            "Financiële markten", href="/page-3", id="page-3-link")),
+            "Top 10 landen exposures", href="/page-3", id="page-3-link")),
         dbc.NavItem(dbc.NavLink(
             "Over", href="/page-4", id="page-4-link")),
         ],
@@ -358,6 +359,49 @@ def contentpensioenfondsen():
 
 
 @cache.memoize(timeout=CACHE_TIMEOUT)
+def contentcountries():
+    return [
+        dbc.Row(
+            dbc.Col(
+                dbc.Card(
+                    dbc.CardBody(
+                        dcc.Loading(id="loading-icon",
+                                    children=dcc.Graph(
+                                        id="country-graph",
+                                        figure=FIGURES.buildCountryExposureGraph(),
+                                        responsive="auto",
+                                        config=FIGURES.graphConfig),
+                                    type="default")))
+                )
+        ),
+        dbc.Row(
+            dbc.Col(
+                dbc.Card([
+                    dbc.CardHeader("Bronnen"),
+                    dbc.CardBody([
+                        dcc.Markdown(
+                            "De volgende openbare bronnen zijn geraadpleegt "
+                            "voor bovenstaande grafiek"),
+                        dcc.Markdown(
+                            "**ABP:** [https://www.abp.nl/over-abp/duurzaam-en-"
+                            "verantwoord-beleggen/waarin-belegt-abp/]"
+                        ),
+                        dcc.Markdown(
+                            "**PFZW:** [https://www.pfzw.nl/over-ons/zo-beleggen"
+                            "-we/waarin-we-beleggen.html]"
+                        ),
+                        dcc.Markdown(
+                            "_Opmerking: Voor PFZW zijn alleen de aandelen "
+                            "en obligaties gekozen_"
+                        )
+                    ])
+                ]),
+            )
+        )
+    ]
+
+
+@cache.memoize(timeout=CACHE_TIMEOUT)
 def contenttabs(tab):
     if tab == "tab-dgr":
         return dbc.Row([
@@ -434,7 +478,7 @@ def render_page_content(pathname):
     elif pathname == "/page-2":
         return contentpensioenfondsen()
     elif pathname == "/page-3":
-        return dbc.Jumbotron(html.P("Work in progress..."))
+        return contentcountries()
     elif pathname == "/page-4":
         return dbc.Jumbotron(aboutcontent)
     # If the user tries to reach a different page, return a 404 message

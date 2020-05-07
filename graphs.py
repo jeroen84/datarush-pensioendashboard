@@ -43,7 +43,6 @@ class GraphLibrary:
         self.dgrgraphs = {}
         self.equitygraphs = {}
         self.ratesgraphs = {}
-        self.contributiongraphs = {}
         self.graphConfig = {"displayModeBar": False}
 
     def buildGraphs(self,
@@ -52,6 +51,7 @@ class GraphLibrary:
                     df_marketdata: pd.DataFrame,
                     df_marketdatanames: pd.DataFrame,
                     df_contribution: pd.DataFrame,
+                    df_countryexposure: pd.DataFrame,
                     rates_indices: list,
                     intervals: list):
         self.df_dgr = df_dgr
@@ -59,6 +59,7 @@ class GraphLibrary:
         self.df_marketdata = df_marketdata
         self.df_marketdatanames = df_marketdatanames
         self.df_contribution = df_contribution
+        self.df_countryexposure = df_countryexposure
         self.rates_indices = rates_indices
         self.intervals = intervals
 
@@ -81,7 +82,6 @@ class GraphLibrary:
             figureDGR = self.buildDGRGraph(_startdate)
             figureEquity = self.buildEquityGraph(_startdate)
             figureRates = self.buildRatesGraph(_startdate)
-            # figureContribution = self.buildContributionGraph("ABP")
 
             self.dgrgraphs.update(
                 {interval:
@@ -115,17 +115,6 @@ class GraphLibrary:
                             )
                     ]}
                 )
-
-            # self.contributiongraphs.update(
-            #     {interval:
-            #         [
-            #             dcc.Graph(
-            #                 figure=figureContribution,
-            #                 responsive="auto",
-            #                 config=self.graphConfig
-            #                 )
-            #         ]}
-            #     )
 
         self.ready.set()
 
@@ -295,7 +284,8 @@ class GraphLibrary:
 
         fig_contr.update_layout(xaxis_rangeslider_visible=False,
                                 title="Wat verklaart het verloop "
-                                      "van de dekkingsgraad ({})?".format(fund),
+                                      "van de dekkingsgraad ({})?".format(
+                                          fund),
                                 barmode="relative",
                                 bargap=0,
                                 legend_orientation="h")
@@ -305,3 +295,107 @@ class GraphLibrary:
             ]
         )
         return fig_contr
+
+    def buildCountryExposureGraph(self):
+        # inspired by
+        # https://plotly.com/python/horizontal-bar-charts/#bar-chart-with-line-plot
+
+        hovertemplate = "Totaal geïnvesteerd in %{y}:<br>EUR %{customdata:,}<br>"
+
+        df_countryexposure = self.df_countryexposure
+
+        fig = make_subplots(rows=1, cols=2, specs=[[{}, {}]],
+                            shared_xaxes=True,
+                            shared_yaxes=False, vertical_spacing=0.001)
+
+        # for now, only ABP and PFZW data available,
+        # raise error if number of funds increase so we can have
+        # a closer look then
+        funds = df_countryexposure["fund"].unique()
+
+        if len(funds) != 2:
+            raise Exception("Other than two funds available in the database "
+                            "regarding country exposure. Please have a look "
+                            "at buildCountryExposureGraph")
+
+        # for column count in the figure
+        col = 1
+
+        for fund in funds:
+            # TO ADD: only pick the latest date (in case there is more than
+            # one data point per fund)
+
+            # filter on only the data of the fund
+            df = df_countryexposure[df_countryexposure["fund"] == fund]
+            # group by country
+            df = df.groupby(by="country").sum()
+            # add the percentage allocation per country
+            df["percentage"] = df["value"] / df["value"].sum()
+            # and then only show the largest 10 countries by value
+            df = df.nlargest(10, "value")
+            # order ascending because then the largest ends up on top
+            # of the plotly graph
+            df = df.sort_values(by="value", ascending=True)
+
+            fig.append_trace(go.Bar(
+                    x=df.percentage,
+                    y=df.index,
+                    customdata=df.value,
+                    hovertemplate=hovertemplate,
+                    marker=dict(
+                        color=LINECOLORS[fund],
+                        line=dict(
+                            color="gray",
+                            width=1),
+                        ),
+                    name=fund,
+                    orientation="h"),
+                row=1,
+                col=col)
+            col += 1
+
+        fig.update_layout(
+            title="Top 10 landen exposures per eind 2019",
+            yaxis=dict(
+                showgrid=False,
+                showline=False,
+                showticklabels=True,
+                domain=[0, 0.85],
+            ),
+            yaxis2=dict(
+                showgrid=False,
+                showline=False,
+                showticklabels=True,
+                domain=[0, 0.85],
+            ),
+            xaxis=dict(
+                zeroline=False,
+                showline=False,
+                showticklabels=True,
+                showgrid=True,
+                domain=[0, 0.45],
+                tickformat=".1%"
+            ),
+            xaxis2=dict(
+                zeroline=False,
+                showline=False,
+                showticklabels=True,
+                showgrid=True,
+                domain=[0.55, 1],
+                tickformat=".1%"
+            ),
+            legend=dict(x=0.029, y=1.038, font_size=10),
+            margin=dict(l=100, r=20, t=70, b=70),
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            font=dict(
+                family="Arial",
+                size=12
+            ),
+        )
+
+        fig.update_traces(texttemplate="%{x:.1%}",
+                          textposition="inside",
+                          cliponaxis=False)
+
+        return fig
