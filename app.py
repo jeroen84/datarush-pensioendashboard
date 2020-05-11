@@ -13,7 +13,7 @@ from threading import Event, Thread
 import os
 from flask_caching import Cache
 
-pio.templates.default = "seaborn"
+pio.templates.default = "plotly_dark"
 
 RATES = ["EUSA30", "EURUSD"]
 TABINTERVALS = ["6m"]
@@ -34,7 +34,7 @@ NEWSAPI = NewsApiClient(api_key=NEWSAPI_KEY)
 # set up the server, using a bootstrap theme
 dash_app = dash.Dash(
     __name__,
-    external_stylesheets=[dbc.themes.LUX],
+    external_stylesheets=[dbc.themes.DARKLY],
     meta_tags=[
         {
             "name": "description",
@@ -316,6 +316,7 @@ def contentpensioenfondsen():
                                 for fund in RISKMODEL.df_contribution.keys()
                             ],
                             value="ABP",
+                            style=dict(color="black")
                         )
                     )
                 ]
@@ -334,7 +335,8 @@ def contentpensioenfondsen():
                                     {"label": "1 dag", "value": "D"},
                                     {"label": "1 week", "value": "W-FRI"}
                                 ],
-                                value="D"
+                                value="D",
+                                style=dict(color="black")
                             )
                     )
                 ]
@@ -383,12 +385,12 @@ def contentcountries():
                             "De volgende openbare bronnen zijn geraadpleegt "
                             "voor bovenstaande grafiek"),
                         dcc.Markdown(
-                            "**ABP:** [https://www.abp.nl/over-abp/duurzaam-en-"
-                            "verantwoord-beleggen/waarin-belegt-abp/]"
+                            "**ABP:** [https://www.abp.nl/over-abp/duurzaam-en"
+                            "-verantwoord-beleggen/waarin-belegt-abp/]"
                         ),
                         dcc.Markdown(
-                            "**PFZW:** [https://www.pfzw.nl/over-ons/zo-beleggen"
-                            "-we/waarin-we-beleggen.html]"
+                            "**PFZW:** [https://www.pfzw.nl/over-ons/zo-"
+                            "beleggen-we/waarin-we-beleggen.html]"
                         ),
                         dcc.Markdown(
                             "_Opmerking: Voor PFZW zijn alleen de aandelen "

@@ -8,7 +8,7 @@ import pandas as pd
 LINECOLORS = {"ABP": "indianred",
               "PFZW": "mediumseagreen",
               "BPF Bouw": "goldenrod",
-              "PMT": "black"}
+              "PMT": "white"}
 
 RANGESELECTOR = dict(
     buttons=list([
@@ -386,8 +386,6 @@ class GraphLibrary:
             ),
             legend=dict(x=0.029, y=1.038, font_size=10),
             margin=dict(l=100, r=20, t=70, b=70),
-            paper_bgcolor="white",
-            plot_bgcolor="white",
             font=dict(
                 family="Arial",
                 size=12
