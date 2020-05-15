@@ -5,15 +5,18 @@ from bs4 import BeautifulSoup
 import requests
 import os
 import logging as LOG
+from pathlib import Path
 
-DB_LOCATION = "db/marketdata.db"
+DIRPATH = Path(os.path.dirname(__file__)).parent
+DBLOCATION = os.path.join(DIRPATH, "db/marketdata.db")
+LOGLOCATION = os.path.join(DIRPATH, "log/backend.log")
 
 # create the log folder, in case it does not exist
 # the logging could crash in case the folder is not present
-os.makedirs("log", exist_ok=True)
+os.makedirs(os.path.dirname(LOGLOCATION), exist_ok=True)
 
 LOG.basicConfig(format='%(asctime)s %(message)s',
-                filename="log/backend.log",
+                filename=LOGLOCATION,
                 level=LOG.INFO)
 
 
@@ -84,7 +87,7 @@ class UpdateDGR:
                                 _dgrwebsite[latestdb[1]] * 100,
                                 _maxdatedgrwebsite[
                                     latestdb[1]].strftime("%Y-%m-%d")))
-                    conn = sqlite3.connect(DB_LOCATION)
+                    conn = sqlite3.connect(DBLOCATION)
                     cur = conn.cursor()
                     cur.execute(_insertquery, [_maxdatedgrwebsite[
                         latestdb[1]].strftime("%Y-%m-%d"),
@@ -106,7 +109,7 @@ class UpdateDGR:
             _query = "SELECT MAX(date) AS [date], name, value FROM " + \
                     "dekkingsgraad GROUP BY name"
 
-            conn = sqlite3.connect(DB_LOCATION)
+            conn = sqlite3.connect(DBLOCATION)
             cur = conn.cursor()
             cur.execute(_query)
             _list = cur.fetchall()

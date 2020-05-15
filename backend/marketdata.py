@@ -6,9 +6,12 @@ from alpha_vantage.foreignexchange import ForeignExchange
 from dateutil.relativedelta import relativedelta
 import logging as LOG
 import os
+from pathlib import Path
 
+DIRPATH = Path(os.path.dirname(__file__)).parent
+DBLOCATION = os.path.join(DIRPATH, "db/marketdata.db")
+LOGLOCATION = os.path.join(DIRPATH, "log/backend.log")
 
-DBLOCATION = "db/marketdata.db"
 ALPHAVANTAGE_API = os.environ["ALPHAVANTAGE_API"]
 EQUITYTICKER = ["EUNL.DE", "IS3N.DE", "GSG"]
 FXTICKER = ["USD"]
@@ -20,10 +23,10 @@ SWAPTICKER = {"EUSA30":
 
 # create the log folder, in case it does not exist
 # the logging could crash in case the folder is not present
-os.makedirs("log", exist_ok=True)
+os.makedirs(os.path.dirname(LOGLOCATION), exist_ok=True)
 
 LOG.basicConfig(format='%(asctime)s %(message)s',
-                filename="log/backend.log",
+                filename=LOGLOCATION,
                 level=LOG.INFO)
 
 

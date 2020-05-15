@@ -1,17 +1,17 @@
-import dash
 from dash.dependencies import Input, Output
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
 import dash_html_components as html
 import plotly.io as pio
 from datetime import datetime
-from dataimport import DataImport
-from riskmodel import RiskModelPF
-from graphs import GraphLibrary
+from .dataimport import DataImport
+from .riskmodel import RiskModelPF
+from .graphs import GraphLibrary
 from newsapi import NewsApiClient
 from threading import Event, Thread
 import os
 from flask_caching import Cache
+from app import app
 
 pio.templates.default = "plotly_dark"
 
@@ -31,36 +31,11 @@ FIGURES = GraphLibrary(READY)
 NEWSAPI_KEY = os.environ["NEWSAPI_KEY"]
 NEWSAPI = NewsApiClient(api_key=NEWSAPI_KEY)
 
-# set up the server, using a bootstrap theme
-dash_app = dash.Dash(
-    __name__,
-    external_stylesheets=[dbc.themes.DARKLY],
-    meta_tags=[
-        {
-            "name": "description",
-            "content": "Actuele situatie van Nederlandse pensioenfondsen"
-                       "in een overzichtelijk dashboard"
-        },
-        {
-            "name": "keywords",
-            "content": "dekkingsgraad, pensioenfondsen, dashboard, datarush"
-        },
-        {
-            "name": "author",
-            "content": "Jeroen van de Erve"
-        },
-        {
-            "name": "viewport",
-            "content": "width=device-width, initial-scale=1.0"
-        },
-        {
-            "http-equiv": "X-UA-Compatible",
-            "content": "IE=edge"
-        },
-    ]
-    )
-app = dash_app.server
-cache = Cache(app, config={
+# define the base path of the dashboard
+# needed in a multipage dashboard
+BASEPATH = "/pensioendashboard"
+
+cache = Cache(app.server, config={
     "CACHE_TYPE": "filesystem",
     "CACHE_DIR": "cache-directory"
 })
@@ -249,13 +224,15 @@ navbar = html.Div([
     html.Hr(),
     dbc.Nav([
         dbc.NavItem(dbc.NavLink(
-            "Overzicht", href="/page-1", id="page-1-link")),
+            "Overzicht", href="{}/page-1".format(BASEPATH), id="page-1-link")),
         dbc.NavItem(dbc.NavLink(
-            "Dekkingsgraadcontributie", href="/page-2", id="page-2-link")),
+            "Dekkingsgraadcontributie", href="{}/page-2".format(BASEPATH),
+            id="page-2-link")),
         dbc.NavItem(dbc.NavLink(
-            "Top 10 landen exposures", href="/page-3", id="page-3-link")),
+            "Top 10 landen exposures", href="{}/page-3".format(BASEPATH),
+            id="page-3-link")),
         dbc.NavItem(dbc.NavLink(
-            "Over", href="/page-4", id="page-4-link")),
+            "Over", href="{}/page-4".format(BASEPATH), id="page-4-link")),
         ],
         fill=True,
         pills=True)
@@ -449,10 +426,10 @@ def contenttabs(tab):
         ])
 
 
-dash_app.config.suppress_callback_exceptions = True
+# dash_app.config.suppress_callback_exceptions = True
 # define the layout of the dashboard
-dash_app.title = "Datarush | Pensioendashboard"
-dash_app.layout = dbc.Container([
+# app.title = "Datarush | Pensioendashboard"
+layout = dbc.Container([
     dcc.Location(id="url"),
     topbar,
     html.Hr(),
@@ -461,27 +438,27 @@ dash_app.layout = dbc.Container([
 ])
 
 
-@dash_app.callback(
+@app.callback(
     [Output(f"page-{i}-link", "active") for i in range(1, 5)],
     [Input("url", "pathname")],
 )
 def toggle_active_links(pathname):
-    if pathname == "/":
+    if pathname == BASEPATH:
         # Treat page 1 as the homepage / index
         return True, False, False, False
-    return [pathname == f"/page-{i}" for i in range(1, 5)]
+    return [pathname == BASEPATH + f"/page-{i}" for i in range(1, 5)]
 
 
-@dash_app.callback(Output("page-content", "children"),
-                   [Input("url", "pathname")])
+@app.callback(Output("page-content", "children"),
+              [Input("url", "pathname")])
 def render_page_content(pathname):
-    if pathname in ["/", "/page-1"]:
+    if pathname in [BASEPATH, "{}/page-1".format(BASEPATH)]:
         return contentoverview()
-    elif pathname == "/page-2":
+    elif pathname == "{}/page-2".format(BASEPATH):
         return contentpensioenfondsen()
-    elif pathname == "/page-3":
+    elif pathname == "{}/page-3".format(BASEPATH):
         return contentcountries()
-    elif pathname == "/page-4":
+    elif pathname == "{}/page-4".format(BASEPATH):
         return dbc.Jumbotron(aboutcontent)
     # If the user tries to reach a different page, return a 404 message
     return dbc.Jumbotron(
@@ -493,13 +470,13 @@ def render_page_content(pathname):
     )
 
 
-@dash_app.callback(Output("content", "children"),
-                   [Input("tabs", "active_tab")])
+@app.callback(Output("content", "children"),
+              [Input("tabs", "active_tab")])
 def switch_tab(at):
     return contenttabs(at)
 
 
-@dash_app.callback(
+@app.callback(
     Output("contribution-graph", "figure"),
     [
         Input("fund-name-dropdown", "value"),
@@ -508,8 +485,3 @@ def switch_tab(at):
 )
 def makeContributionGraph(fund, bin):
     return FIGURES.buildContributionGraph(fund, bin)
-
-
-# run the dashboard
-if __name__ == "__main__":
-    dash_app.run_server(debug=False)

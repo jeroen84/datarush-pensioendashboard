@@ -1,7 +1,9 @@
 import pandas as pd
 from sqlalchemy import create_engine
+import os
 
-DBLOCATION = "db/marketdata.db"
+DIRPATH = os.path.dirname(os.path.realpath(__file__))
+DBLOCATION = os.path.join(DIRPATH, "db/marketdata.db")
 
 
 class DataImport:
