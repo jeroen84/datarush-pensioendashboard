@@ -8,7 +8,6 @@ from .dataimport import DataImport
 from .riskmodel import RiskModelPF
 from .graphs import GraphLibrary
 from newsapi import NewsApiClient
-from threading import Event, Thread
 import os
 from flask_caching import Cache
 from app import app
@@ -23,9 +22,8 @@ DATA = DataImport()
 RISKMODEL = RiskModelPF()
 
 # for threadign purposes
-READY = Event()
 global FIGURES
-FIGURES = GraphLibrary(READY)
+FIGURES = GraphLibrary()
 
 # set news api
 NEWSAPI_KEY = os.environ["NEWSAPI_KEY"]
@@ -85,9 +83,7 @@ def getMarketData():
     RISKMODEL.makePrediction()
     RISKMODEL.makeContribution()
 
-    # threading because otherwise not all graphs are completed
-    # at startup
-    thread = Thread(target=FIGURES.buildGraphs, args=(
+    FIGURES.buildGraphs(
         DATA.df_dgr,
         RISKMODEL.df_predict,
         DATA.df_marketdata.dropna(),
@@ -96,10 +92,7 @@ def getMarketData():
         DATA.df_countryexposure,
         RATES,
         TABINTERVALS
-    ))
-
-    thread.start()
-    READY.wait()
+    )
 
 
 def buildCardLatestDGR(df_dgr, df_predict):

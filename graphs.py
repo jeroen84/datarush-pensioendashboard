@@ -38,8 +38,7 @@ RANGESELECTOR = dict(
 
 class GraphLibrary:
 
-    def __init__(self, ready):
-        self.ready = ready
+    def __init__(self):
         self.dgrgraphs = {}
         self.equitygraphs = {}
         self.ratesgraphs = {}
@@ -115,8 +114,6 @@ class GraphLibrary:
                             )
                     ]}
                 )
-
-        self.ready.set()
 
     def buildDGRGraph(self, start_date=None):
 
