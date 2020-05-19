@@ -1,4 +1,3 @@
-from dotenv import load_dotenv
 import os
 from pathlib import Path
 import logging as LOG
@@ -8,8 +7,6 @@ import shutil
 DIRPATH = Path(os.path.dirname(__file__)).parent
 DBLOCATION = os.path.join(DIRPATH, "db/marketdata.db")
 LOGLOCATION = os.path.join(DIRPATH, "log/backend.log")
-# load the environment variables
-load_dotenv(os.path.join(DIRPATH.parent, ".env"))
 
 
 def backupDB():
