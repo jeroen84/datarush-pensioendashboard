@@ -128,27 +128,34 @@ def buildCardLatestDGR(df_dgr, df_predict):
         else:
             fund_rename = fund
 
+        # determine the color of the delta: green if positive, red if negative
+        if delta_latest_predict >= 0:
+            fontcolor = "green"
+        else:
+            fontcolor = "red"
+
         dbcLayout.append(
                 dbc.Col([
                     dbc.Card(
                         dbc.CardBody([
-
                             html.H4(fund_rename, className="card-title"),
-                            html.Div([
-                                "{:.1f}% ".format(max_predict_dgr),
-                                html.Sub("({})".format(
-                                    max_predict_date.strftime("%d-%m-%Y")))
+                            html.H3([
+                                html.Span("{:.1f}% ".format(max_predict_dgr)),
+                                html.Span("{:+.1f}%".format(
+                                    delta_latest_predict),
+                                          className="delta-{}".format(fund),
+                                          style={"color": fontcolor})
                                     ],
-                                     className="card-text"),
-                            html.Small("{:+.1f}% t.o.v. {}".format(
-                                delta_latest_predict,
-                                latest_official_dgr_date.strftime("%d-%m-%Y")),
-                                     className="card-text")
+                                    className="card-text-{}".format(fund)),
+                            html.Small("per {}".format(
+                                max_predict_date.strftime("%d-%m-%Y")),
+                                     className="card-small-{}".format(fund))
                         ], id="tooltip-dgr-{}".format(fund[0:3]))
                         # [0:3] ivm spatie bij BPF Bouw
                     ),
-                    dbc.Tooltip("Meest recente schatting per {}".format(
-                        max_predict_date.strftime("%d-%m-%Y")),
+                    dbc.Tooltip("{:+.1f}% verschil t.o.v. {}".format(
+                        delta_latest_predict,
+                        latest_official_dgr_date.strftime("%d-%m-%Y")),
                         target="tooltip-dgr-{}".format(fund[0:3]))
                 ])
         )
