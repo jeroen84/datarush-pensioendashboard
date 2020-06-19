@@ -75,10 +75,7 @@ def buildNewsFeed(topic):
 
 
 def getMarketData():
-    # first refresh the dataset
-    DATA.refreshData()
-
-    # then run model
+    # run risk model
     RISKMODEL.runLinearModel(DATA.df_marketdata, DATA.df_dgr)
     RISKMODEL.makePrediction()
     RISKMODEL.makeContribution()
@@ -93,6 +90,55 @@ def getMarketData():
         RATES,
         TABINTERVALS
     )
+
+
+def topCardLayout(title: str,
+                  value: float,
+                  change: float,
+                  date,
+                  dgr: bool,
+                  rates: bool) -> dbc.Card:
+    """
+    Make a top (summary) card with the value, delta and date.
+    """
+
+    # determine the color of the delta: green if positive, red if negative
+
+    if change >= 0:
+        fontcolor = "green"
+    else:
+        fontcolor = "red"
+
+    # in case the card is for the dekkingsgraden, make the value a percentage,
+    # otherwise, make the value without percentage sign
+    if dgr:
+        _valueformat = "{:.1f}% "
+        textH = html.H3
+    else:
+        _valueformat = "{:.2f} "
+        textH = html.H5
+
+    if rates:
+        _deltaformat = "{:+.2f}"
+    else:
+        _deltaformat = "{:+.1f}%"
+
+    return dbc.Card([
+        dbc.CardHeader(title),
+        dbc.CardBody([
+            # titleH(title, className="card-title"),
+            textH([
+                html.Span(_valueformat.format(value)),
+                html.Span(_deltaformat.format(change),
+                          className="delta-{}".format(title.lower()),
+                          style={"color": fontcolor})
+            ],
+                  className="card-text-{}".format(title.lower())),
+            html.Small("per {}".format(
+                date.strftime("%d-%m-%Y")),
+                        className="card-small-{}".format(title))
+        ], id="tooltip-dgr-{}".format(title))
+    ])
 
 
 def buildCardLatestDGR(df_dgr, df_predict):
@@ -121,42 +167,56 @@ def buildCardLatestDGR(df_dgr, df_predict):
         else:
             fund_rename = fund
 
-        # determine the color of the delta: green if positive, red if negative
-        if delta_latest_predict >= 0:
-            fontcolor = "green"
-        else:
-            fontcolor = "red"
-
         dbcLayout.append(
                 dbc.Col([
-                    dbc.Card(
-                        dbc.CardBody([
-                            html.H4(fund_rename, className="card-title"),
-                            html.H3([
-                                html.Span("{:.1f}% ".format(max_predict_dgr)),
-                                html.Span("{:+.1f}%".format(
-                                    delta_latest_predict),
-                                          className="delta-{}".format(fund),
-                                          style={"color": fontcolor})
-                                    ],
-                                    className="card-text-{}".format(fund)),
-                            html.Small("per {}".format(
-                                max_predict_date.strftime("%d-%m-%Y")),
-                                     className="card-small-{}".format(fund))
-                        ], id="tooltip-dgr-{}".format(fund[0:3]))
-                        # [0:3] ivm spatie bij BPF Bouw
-                    ),
+                    topCardLayout(fund_rename,
+                                  max_predict_dgr,
+                                  delta_latest_predict,
+                                  max_predict_date,
+                                  True,
+                                  False),
                     dbc.Tooltip("{:+.1f}% verschil t.o.v. {}".format(
                         delta_latest_predict,
                         latest_official_dgr_date.strftime("%d-%m-%Y")),
-                        target="tooltip-dgr-{}".format(fund[0:3]))
+                        target="tooltip-dgr-{}".format(fund_rename))
                 ])
         )
 
-    return dbc.Row(
+    _marketdata = DATA.df_marketdata.dropna()
+    dbcMarkets = []
+
+    for market in _marketdata.columns:
+        latest_value = _marketdata[market].iloc[-1:].values[0]
+        max_date = _marketdata.index.max()
+
+        if market in RATES:
+            latest_delta = _marketdata[market].diff().iloc[-1:].values[0]
+            ratesformat = True
+        else:
+            latest_delta = _marketdata[market].pct_change().iloc[-1:].values[0] * 100
+            ratesformat = False
+
+        dbcMarkets.append(
+            dbc.Col([
+                topCardLayout(DATA.df_marketdatanames[market],
+                              latest_value,
+                              latest_delta,
+                              max_date,
+                              False,
+                              ratesformat)
+            ])
+        )
+
+    return dbc.Col([
+        dbc.Row(
             dbcLayout,
             no_gutters=True
+        ),
+        dbc.Row(
+            dbcMarkets,
+            no_gutters=True
         )
+    ])
 
 
 # CONTENT OF THE SITE

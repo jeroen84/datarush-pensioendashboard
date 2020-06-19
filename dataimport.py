@@ -13,6 +13,7 @@ class DataImport:
         self.source = source
         # error handling
         self.startConnection()
+        self.refreshData()
 
     def refreshData(self):
         self.df_marketdata = self.loadMarketData()
