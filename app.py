@@ -304,6 +304,7 @@ content = html.Div(id="page-content")
 
 @cache.memoize(timeout=CACHE_TIMEOUT)
 def contentoverview():
+    DATA.refreshData()
     getMarketData()
     latestDGRCards = buildCardLatestDGR(DATA.df_dgr,
                                         RISKMODEL.df_predict)
