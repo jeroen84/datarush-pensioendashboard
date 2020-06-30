@@ -13,7 +13,7 @@ DBLOCATION = os.path.join(DIRPATH, "db/marketdata.db")
 LOGLOCATION = os.path.join(DIRPATH, "log/backend.log")
 
 ALPHAVANTAGE_API = os.environ["ALPHAVANTAGE_API"]
-EQUITYTICKER = ["EUNL.DE", "IS3N.DE", "GSG"]
+EQUITYTICKER = ["IWDA.AS", "EMIM.AS", "GSG"]
 FXTICKER = ["USD"]
 # swap ticker slightly different, as a dict including website address
 SWAPTICKER = {"EUSA30":
