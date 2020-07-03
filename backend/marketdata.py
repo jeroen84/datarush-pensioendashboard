@@ -13,7 +13,23 @@ DBLOCATION = os.path.join(DIRPATH, "db/marketdata.db")
 LOGLOCATION = os.path.join(DIRPATH, "log/backend.log")
 
 ALPHAVANTAGE_API = os.environ["ALPHAVANTAGE_API"]
-EQUITYTICKER = ["IWDA.AS", "EMIM.AS", "GSG"]
+
+# equity ticker dict, whereby the keys are the links to
+# the fallback scenario, in case Alpha Vantage does not
+# provide quotes
+EQUITYTICKER = {"IWDA.AS":
+                "https://www.iex.nl/"
+                "Beleggingsfonds-Koers/319919/"
+                "iShares-Core-MSCI-World-UCITS-ETF/"
+                "historische-koersen.aspx?maand={}",
+                "EMIM.AS":
+                "https://www.iex.nl/"
+                "Beleggingsfonds-Koers/608862/"
+                "iShares-Core-MSCI-Emerging-Markets-IMI-UCITS-ETF/"
+                "historische-koersen.aspx?maand={}",
+                "GSG":
+                None}
+
 FXTICKER = ["USD"]
 # swap ticker slightly different, as a dict including website address
 SWAPTICKER = {"EUSA30":
@@ -62,8 +78,14 @@ class MarketData:
                 # get the daily quotes, compact size
                 LOG.info("Getting new data for ticker {}".format(ticker))
                 _df, _ = self.ts.get_daily(ticker, outputsize="compact")
+                _df = pd.DataFrame(_df["4. close"]).rename(
+                    columns={"4. close": "value"})
+                # add ticker name to the dataframe as a column
+                _df["name"] = ticker
 
-                self.ProcessToDB(_df, ticker)
+                _df_fallback = self.IEXScraper(ticker, EQUITYTICKER[ticker])
+
+                self.ProcessToDB(_df, ticker, _df_fallback)
 
             # secon, get the FXTICKER
             for fx in FXTICKER:
@@ -75,45 +97,58 @@ class MarketData:
                     outputsize="compact")
                 # add check whether _json returns data...
                 _df = pd.DataFrame(data=_json[0], dtype=float).transpose()
+                _df = pd.DataFrame(_df["4. close"]).rename(
+                    columns={"4. close": "value"})
+                _df["name"] = "EUR{}".format(fx)
+
                 # reformat the index, to be in line with equities
                 _df.index = pd.to_datetime(_df.index)
                 _df.index.name = "date"
 
-                self.ProcessToDB(_df, "EUR{}".format(fx))
+                self.ProcessToDB(_df, "EUR{}".format(fx), pd.DataFrame())
         except Exception as err:
             LOG.error("Updating equity and FX result in error: {}".format(err))
 
     def UpdateInterestRates(self):
+        try:
+            for ticker in SWAPTICKER:
+                _df = self.IEXScraper(ticker, SWAPTICKER[ticker])
+
+                self.ProcessToDB(_df, ticker, pd.DataFrame())
+        except Exception as err:
+            LOG.error("UpdateInterestRates resulted in an error: {}".format(
+                err))
+
+    def IEXScraper(self, ticker, link) -> pd.DataFrame:
         # this is a IEX website scraper
         # determine last data point
         # is this last data point in the current month?
         # otherwise include suffix to webaddress equal
         # to number of months before
         try:
-            # translate table
-            _DIC = {" jan": "-01-",
-                    " feb": "-02-",
-                    " mrt": "-03-",
-                    " apr": "-04-",
-                    " mei": "-05-",
-                    " jun": "-06-",
-                    " jul": "-07-",
-                    " aug": "-08-",
-                    " sep": "-09-",
-                    " okt": "-10-",
-                    " nov": "-11-",
-                    " dec": "-12-"}
+            if link is not None:
+                # translate table
+                _DIC = {" jan": "-01-",
+                        " feb": "-02-",
+                        " mrt": "-03-",
+                        " apr": "-04-",
+                        " mei": "-05-",
+                        " jun": "-06-",
+                        " jul": "-07-",
+                        " aug": "-08-",
+                        " sep": "-09-",
+                        " okt": "-10-",
+                        " nov": "-11-",
+                        " dec": "-12-"}
 
-            for swapticker in SWAPTICKER:
-                _max_date = self.df_db[swapticker].dropna().index.max()
+                _max_date = self.df_db[ticker].dropna().index.max()
                 _today = pd.to_datetime("today")
 
                 _numbermonths = (_today.year * 12) - (_max_date.year * 12) + \
                     _today.month - _max_date.month
 
-                LOG.info("Getting new data for ticker {}".format(swapticker))
                 for x in range(0, _numbermonths+1):
-                    _df = pd.read_html(SWAPTICKER[swapticker].format(
+                    _df = pd.read_html(link.format(
                                     x),
                                     decimal=",",
                                     thousands=".")[2][["Datum", "Slot"]]
@@ -129,15 +164,20 @@ class MarketData:
                                                   format="%d-%m-%Y")
 
                     _df.rename(columns={"Datum": "date",
-                                        "Slot": "4. close"}, inplace=True)
+                                        "Slot": "value"}, inplace=True)
                     _df.set_index("date", inplace=True)
+                    _df["name"] = ticker
 
-                    self.ProcessToDB(_df, swapticker)
+                    return _df
+            else:
+                return pd.DataFrame()  # empty dataframe if no link is provided
+
         except Exception as err:
-            LOG.error("UpdateInterestRate resulted in an error: {}".format(
+            LOG.error("IEXScraper resulted in an error: {}".format(
                 err))
 
-    def ProcessToDB(self, df_source: pd.DataFrame, ticker):
+    def ProcessToDB(self, df_source: pd.DataFrame, ticker,
+                    df_fallback: pd.DataFrame):
         # first, extract all data that is not present
         # in database (ie missing dates)
         # then write to db the missing date values
@@ -151,35 +191,49 @@ class MarketData:
                 LOG.info("Succesfully received data "
                          "for ticker {}".format(ticker))
 
-            _df = pd.DataFrame(df_source["4. close"]).rename(
-                columns={"4. close": "value"})
-            # add ticker name to the dataframe as a column
-            _df["name"] = ticker
             # Compare with db, and filter what is missing
             # we can do this by a outer join, or just say
             # pick all dates from Alphavintage that are beyond the latest
             # date of the db.
             _max_date = self.df_db[ticker].dropna().index.max()
-            _df = _df[_df.index > _max_date]
-
+            _df = df_source[df_source.index > _max_date]
+            _df_fallback = df_fallback[df_fallback.index > _max_date]
             # exclude today's value, for now?
             # live quotes should be somewhere else ?
             _df = _df[_df.index != np.datetime64("today")]
+            _df_fallback = _df_fallback[_df_fallback.index !=
+                                        np.datetime64("today")]
 
-            if not _df.empty:
+            _df_write = pd.DataFrame()
+            # in case there is no new data from AlphaVantage
+            if _df.empty:
+                LOG.info("No new data for {} from AlphaVantage, trying "
+                         "alternative source...".format(ticker))
+
+                if _df_fallback.empty:
+                    LOG.info("Also no data from alternative data source "
+                             "for {}. The latest data point is: {}".format(
+                                 ticker, _max_date))
+                else:
+                    _df_write = _df_fallback
+                    LOG.info("Found new data points from alternative "
+                             "data source for {}".format(ticker))
+            else:  # i.e. when there are new data points from AlphaVantage
+                _df_write = _df
+                LOG.info("Found new data points from AlphaVantage for "
+                         "{}".format(ticker))
+
+            if not _df_write.empty:
                 # write to database
-                _df = _df.reset_index()
-                _df["date"] = _df["date"].dt.strftime("%Y-%m-%d")
-                _df.to_sql(name="marketdata",
-                           con=self.conn,
-                           index=False,
-                           if_exists="append")
+                _df_write = _df_write.reset_index()
+                _df_write["date"] = _df_write["date"].dt.strftime("%Y-%m-%d")
+                _df_write.to_sql(name="marketdata",
+                                 con=self.conn,
+                                 index=False,
+                                 if_exists="append")
                 LOG.info("Successfully updated ticker {} with dates {} "
                          "and values {}".format(ticker,
-                                                _df["date"].values,
-                                                _df["value"].values))
-            else:
-                # include feedback to logging (TO DO)
-                LOG.info("No new data for {}".format(ticker))
+                                                _df_write["date"].values,
+                                                _df_write["value"].values))
         except Exception as err:
             LOG.error("ProcessToDB resulted in an error: {}".format(err))
