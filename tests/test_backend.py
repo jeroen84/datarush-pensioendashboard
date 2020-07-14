@@ -9,26 +9,14 @@
 # test dependencies
 
 # from tests.conftest import market_data
-from ..backend.marketdata import EQUITYTICKER, MarketData
-import pytest
+from ..backend.marketdata import EQUITYTICKER, SWAPTICKER, MarketData
+from dateutil.relativedelta import relativedelta
+from datetime import date
 
 data = MarketData()
-SWAPTICKER = {"EUSA30":
-              "https://www.iex.nl/"
-              "Rente-Koers/61375432/IRS-30Y-30-360-ANN-6M-EURIBOR/"
-              "historische-koersen.aspx"}
-EQUITYTICKER = {"IWDA.AS":
-                "https://www.iex.nl/"
-                "Beleggingsfonds-Koers/319919/"
-                "iShares-Core-MSCI-World-UCITS-ETF/"
-                "historische-koersen.aspx",
-                "EMIM.AS":
-                "https://www.iex.nl/"
-                "Beleggingsfonds-Koers/608862/"
-                "iShares-Core-MSCI-Emerging-Markets-IMI-UCITS-ETF/"
-                "historische-koersen.aspx",
-                "GSG":
-                None}
+# number of days in which you can say that the
+# data is 'recent'. Is very arbitrary.
+RECENTDAYS = 3
 
 
 def test_dbdata_available():
@@ -51,11 +39,20 @@ def test_foreignexchange_available():
 def test_iexscraper_swap_available():
     ticker = list(SWAPTICKER)[0]
     df = data.IEXScraper(ticker, SWAPTICKER[ticker])
+
+    # is the dataframe empty? should not be
     assert df.empty is False
+    # do you get recent data?
+    assert max(df.index) >= date.today() - relativedelta(days=RECENTDAYS)
 
 
 def test_iexscraper_equity_available():
     for equity in EQUITYTICKER:
         if EQUITYTICKER[equity] is not None:
             df = data.IEXScraper(equity, EQUITYTICKER[equity])
+
+            # is the dataframe empty? should not be
             assert df.empty is False
+            # do you get recent data?
+            assert max(df.index) >= date.today() - \
+                relativedelta(days=RECENTDAYS)

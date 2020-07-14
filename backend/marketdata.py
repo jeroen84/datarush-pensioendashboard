@@ -7,6 +7,7 @@ from dateutil.relativedelta import relativedelta
 import logging as LOG
 import os
 from pathlib import Path
+from dateparser import parse
 
 DIRPATH = Path(os.path.dirname(__file__)).parent
 DBLOCATION = os.path.join(DIRPATH, "db/marketdata.db")
@@ -127,41 +128,27 @@ class MarketData:
         # to number of months before
         try:
             if link is not None:
-                # translate table
-                _DIC = {" jan": "-01-",
-                        " feb": "-02-",
-                        " mrt": "-03-",
-                        " apr": "-04-",
-                        " mei": "-05-",
-                        " jun": "-06-",
-                        " jul": "-07-",
-                        " aug": "-08-",
-                        " sep": "-09-",
-                        " okt": "-10-",
-                        " nov": "-11-",
-                        " dec": "-12-"}
-
                 _max_date = self.df_db[ticker].dropna().index.max()
                 _today = pd.to_datetime("today")
 
+                # determine the number of months required to download
                 _numbermonths = (_today.year * 12) - (_max_date.year * 12) + \
                     _today.month - _max_date.month
 
                 for x in range(0, _numbermonths+1):
+                    # the link requires a "yyymm" extension in order
+                    # to get the history of a specific year and month
+                    # so, determine the extension
+                    _query = (_today - relativedelta(months=x)).strftime(
+                        "%Y%m")
                     _df = pd.read_html(link.format(
-                                    x),
+                                    _query),
                                     decimal=",",
-                                    thousands=".")[2][["Datum", "Slot"]]
+                                    thousands=".")[1][["Datum", "Slot"]]
 
-                    for y in _DIC:
-                        _df["Datum"] = _df["Datum"].str.replace(y, _DIC[y])
-
-                    # add year
-                    _df["Datum"] += str((_today - relativedelta(
-                                                months=_numbermonths)).year)
-
-                    _df["Datum"] = pd.to_datetime(_df["Datum"],
-                                                  format="%d-%m-%Y")
+                    # format the date string to a datetime64 object
+                    # using dateparser library
+                    _df["Datum"] = _df["Datum"].apply(parse)
 
                     _df.rename(columns={"Datum": "date",
                                         "Slot": "value"}, inplace=True)
