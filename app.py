@@ -4,8 +4,7 @@ import dash_bootstrap_components as dbc
 import dash_html_components as html
 import plotly.io as pio
 from datetime import datetime
-from .backend.dataimport import DataImport
-from .graphs import GraphLibrary
+from .backend.graphs import GraphLibrary
 from newsapi import NewsApiClient
 import os
 from flask_caching import Cache
@@ -15,19 +14,9 @@ pio.templates.default = "plotly_dark"
 
 RATES = ["EUSA30", "EURUSD"]
 
-# initiate DataImport and RiskModelPF class
-DATA = DataImport()
-
 # for threadign purposes
 global FIGURES
-FIGURES = GraphLibrary(
-    DATA.df_dgr,
-    DATA.df_predict,
-    DATA.df_marketdata.dropna(),
-    DATA.df_marketdatanames,
-    DATA.df_contribution,
-    DATA.df_countryexposure,
-    RATES)
+FIGURES = GraphLibrary(RATES)
 
 # set news api
 NEWSAPI_KEY = os.environ["NEWSAPI_KEY"]
@@ -41,7 +30,7 @@ cache = Cache(app.server, config={
     "CACHE_TYPE": "filesystem",
     "CACHE_DIR": "cache-directory"
 })
-CACHE_TIMEOUT = 600
+CACHE_TIMEOUT = 60
 cache.clear()
 
 
@@ -76,134 +65,6 @@ def buildNewsFeed(topic):
                                             href=item["url"],
                                             target="_blank"))
     return news_items
-
-
-def topCardLayout(title: str,
-                  value: float,
-                  change: float,
-                  date,
-                  dgr: bool,
-                  rates: bool) -> dbc.Card:
-    """
-    Make a top (summary) card with the value, delta and date.
-    """
-
-    # determine the color of the delta: green if positive, red if negative
-
-    if change >= 0:
-        fontcolor = "green"
-    else:
-        fontcolor = "red"
-
-    # in case the card is for the dekkingsgraden, make the value a percentage,
-    # otherwise, make the value without percentage sign
-    if dgr:
-        _valueformat = "{:.1f}% "
-        textH = html.H3
-    else:
-        _valueformat = "{:.2f} "
-        textH = html.H5
-
-    if rates:
-        _deltaformat = "{:+.2f}"
-    else:
-        _deltaformat = "{:+.1f}%"
-
-    return dbc.Card([
-        dbc.CardHeader(title),
-        dbc.CardBody([
-            # titleH(title, className="card-title"),
-            textH([
-                html.Span(_valueformat.format(value)),
-                html.Span(_deltaformat.format(change),
-                          className="delta-{}".format(title.lower()),
-                          style={"color": fontcolor})
-            ],
-                  className="card-text-{}".format(title.lower())),
-            html.Small("per {}".format(
-                date.strftime("%d-%m-%Y")),
-                        className="card-small-{}".format(title))
-        ], id="tooltip-dgr-{}".format(title))
-    ])
-
-
-def buildCardLatestDGR(df_dgr, df_predict):
-    dbcLayout = []
-
-    for fund in df_dgr["fonds"].sort_values().unique():
-        # predictions
-        df_predict_fund = df_predict[df_predict["fund"] == fund]
-        max_predict_date = max(df_predict_fund.index)
-        max_predict_dgr = df_predict_fund[
-            df_predict_fund.index == max_predict_date]
-        max_predict_dgr = max_predict_dgr["dekkingsgraad"][0]
-
-        # last official number
-        df_dgr_fund = df_dgr[df_dgr["fonds"] == fund]
-        latest_official_dgr_date = max(df_dgr_fund["date"])
-        latest_official_dgr = df_dgr_fund[
-            df_dgr_fund["date"] == latest_official_dgr_date]
-        latest_official_dgr = latest_official_dgr["dekkingsgraad"].values[0]
-
-        delta_latest_predict = max_predict_dgr - latest_official_dgr
-
-        # ugly, but for now ok. For responsiveness change name to short "Bouw"
-        if fund == "BPF Bouw":
-            fund_rename = "Bouw"
-        else:
-            fund_rename = fund
-
-        dbcLayout.append(
-                dbc.Col([
-                    topCardLayout(fund_rename,
-                                  max_predict_dgr,
-                                  delta_latest_predict,
-                                  max_predict_date,
-                                  True,
-                                  False),
-                    dbc.Tooltip("{:+.1f}% verschil t.o.v. {}".format(
-                        delta_latest_predict,
-                        latest_official_dgr_date.strftime("%d-%m-%Y")),
-                        target="tooltip-dgr-{}".format(fund_rename))
-                ])
-        )
-
-    _marketdata = DATA.df_marketdata.dropna()
-    dbcMarkets = []
-
-    for market in _marketdata.columns:
-        latest_value = _marketdata[market].iloc[-1:].values[0]
-        max_date = _marketdata.index.max()
-
-        if market in RATES:
-            latest_delta = _marketdata[market].diff().iloc[-1:].values[0]
-            ratesformat = True
-        else:
-            latest_delta = _marketdata[market].pct_change().iloc[-1:].values[
-                0] * 100
-            ratesformat = False
-
-        dbcMarkets.append(
-            dbc.Col([
-                topCardLayout(DATA.df_marketdatanames[market],
-                              latest_value,
-                              latest_delta,
-                              max_date,
-                              False,
-                              ratesformat)
-            ])
-        )
-
-    return dbc.Col([
-        dbc.Row(
-            dbcLayout,
-            no_gutters=True
-        ),
-        dbc.Row(
-            dbcMarkets,
-            no_gutters=True
-        )
-    ])
 
 
 # CONTENT OF THE SITE
@@ -288,9 +149,9 @@ content = html.Div(id="page-content")
 # --------------
 
 
+@cache.memoize(timeout=CACHE_TIMEOUT)
 def contentoverview():
-    latestDGRCards = buildCardLatestDGR(DATA.df_dgr,
-                                        DATA.df_predict)
+    latestDGRCards = FIGURES.buildTopCards()
 
     return html.Div([
         html.P(latestDGRCards),
@@ -307,6 +168,7 @@ def contentoverview():
     ])
 
 
+@cache.memoize(timeout=CACHE_TIMEOUT)
 def contentpensioenfondsen():
     return [
         dbc.Row(
@@ -333,7 +195,7 @@ def contentpensioenfondsen():
                             id="fund-name-dropdown",
                             options=[
                                 {"label": fund, "value": fund}
-                                for fund in DATA.df_contribution[
+                                for fund in FIGURES.dgr_contribution[
                                     "fund"].sort_values().unique()
                             ],
                             value="ABP",
@@ -381,6 +243,7 @@ def contentpensioenfondsen():
     ]
 
 
+@cache.memoize(timeout=CACHE_TIMEOUT)
 def contentcountries():
     return [
         dbc.Row(
@@ -423,6 +286,7 @@ def contentcountries():
     ]
 
 
+@cache.memoize(timeout=CACHE_TIMEOUT)
 def contenttabs(tab):
     if tab == "tab-dgr":
         return dbc.Row([

@@ -1,9 +1,12 @@
 import plotly.graph_objects as go
 import dash_core_components as dcc
+import dash_bootstrap_components as dbc
+import dash_html_components as html
 from plotly.subplots import make_subplots
 import pandas as pd
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from .dataimport import DataImport
 
 INTERVAL = -6  # months
 STARTDATE = datetime.now() + relativedelta(months=INTERVAL)
@@ -39,23 +42,11 @@ RANGESELECTOR = dict(
     ]))
 
 
-class GraphLibrary:
+class GraphLibrary(DataImport):
 
     def __init__(self,
-                 df_dgr: pd.DataFrame,
-                 df_predict: pd.DataFrame,
-                 df_marketdata: pd.DataFrame,
-                 df_marketdatanames: pd.DataFrame,
-                 df_contribution: pd.DataFrame,
-                 df_countryexposure: pd.DataFrame,
                  rates_indices: list,
                  graphConfig: dict = {"displayModeBar": False}):
-        self.df_dgr = df_dgr
-        self.df_predict = df_predict
-        self.df_marketdata = df_marketdata
-        self.df_marketdatanames = df_marketdatanames
-        self.df_contribution = df_contribution
-        self.df_countryexposure = df_countryexposure
         self.rates_indices = rates_indices
         self.graphConfig = graphConfig
 
@@ -66,8 +57,8 @@ class GraphLibrary:
                         "<b>Dekkingsgraad:</b> %{y:.1f}%<br>"
 
         # add lines for each pensionfund
-        for fund in self.df_dgr["fonds"].sort_values().unique():
-            df = self.df_dgr[self.df_dgr["fonds"] == fund]
+        for fund in self.dekkingsgraden["fonds"].sort_values().unique():
+            df = self.dekkingsgraden[self.dekkingsgraden["fonds"] == fund]
 
             if start_date is None:
                 pass
@@ -84,7 +75,8 @@ class GraphLibrary:
                                                    color=LINECOLORS[fund]),
                                          name=fund))
 
-            df_predict_fund = self.df_predict[self.df_predict["fund"] == fund]
+            df_predict_fund = self.dgr_prediction[self.dgr_prediction[
+                "fund"] == fund]
             # add prediction line
             fig_dgr.add_trace(go.Scatter(x=df_predict_fund.index,
                                          y=df_predict_fund["dekkingsgraad"],
@@ -107,9 +99,9 @@ class GraphLibrary:
         # ----------
         # first filter on start_date
         if start_date is None:
-            df = self.df_marketdata
+            df = self.marketdata
         else:
-            df = self.df_marketdata[self.df_marketdata.index >= start_date]
+            df = self.marketdata[self.marketdata.index >= start_date]
 
         # create market indices graphs (equities and commodities)
         df_dailyreturns = df.drop(
@@ -126,7 +118,7 @@ class GraphLibrary:
             _y = df_cumreturns[x]
             _y_perc = df_cumreturns[x] - 100
 
-            long_name = self.df_marketdatanames[x]
+            long_name = self.marketdatanames[x]
             fig_equity.add_trace(go.Scatter(x=_x,
                                             y=_y,
                                             customdata=_y_perc,
@@ -146,7 +138,7 @@ class GraphLibrary:
     def buildRatesGraph(self, start_date=STARTDATE):
         # ----------
         # create market indices graphs (EUSA30 and EURUSD)
-        df_rates = self.df_marketdata[self.rates_indices]
+        df_rates = self.marketdata[self.rates_indices]
 
         hovertemplate = "<b>Datum:</b> %{x}<br><br>" \
                         "<b>Niveau:</b> %{y:.2f}<br>"
@@ -187,8 +179,8 @@ class GraphLibrary:
         hovertemplatepredict = "<b>Datum:</b> %{x}<br><br>" \
                                "<b>Dekkingsgraad:</b> %{y:.1f}%<br>"
 
-        df_contribution_fund = self.df_contribution[
-            self.df_contribution["fund"] == fund]
+        df_contribution_fund = self.dgr_contribution[
+            self.dgr_contribution["fund"] == fund]
 
         if bin is not None:
             df_contribution_fund = df_contribution_fund.groupby(
@@ -203,7 +195,7 @@ class GraphLibrary:
             _y = df_contribution_fund.loc[
                 df_contribution_fund.index.get_level_values("index") == market
                 ]["value"]
-            long_name = self.df_marketdatanames[market]
+            long_name = self.marketdatanames[market]
 
             fig_contr.add_trace(go.Bar(x=_x,
                                        y=_y,
@@ -211,7 +203,8 @@ class GraphLibrary:
                                        name=long_name),
                                 secondary_y=False)
         # add prediction line
-        df_predict_fund = self.df_predict[self.df_predict["fund"] == fund]
+        df_predict_fund = self.dgr_prediction[
+            self.dgr_prediction["fund"] == fund]
 
         # only show the prediction values that are equal to the bins
         if bin is not None:
@@ -259,7 +252,7 @@ class GraphLibrary:
         hovertemplate = "Totaal geïnvesteerd in %{y}:<br>EUR " \
             "%{customdata:,}<br>"
 
-        df_countryexposure = self.df_countryexposure
+        df_countryexposure = self.countryexposure
 
         fig = make_subplots(rows=1, cols=2, specs=[[{}, {}]],
                             shared_xaxes=True,
@@ -354,3 +347,138 @@ class GraphLibrary:
                           cliponaxis=False)
 
         return fig
+
+    def buildTopCards(self) -> dbc.Col:
+        """
+        Build the top cards that present the latest dekkingsgraden and
+        the latest markets
+        """
+        dbcLayout = []
+
+        for fund in self.dekkingsgraden["fonds"].sort_values().unique():
+            # predictions
+            df_predict_fund = self.dgr_prediction[
+                self.dgr_prediction["fund"] == fund]
+            max_predict_date = max(df_predict_fund.index)
+            max_predict_dgr = df_predict_fund[
+                df_predict_fund.index == max_predict_date]
+            max_predict_dgr = max_predict_dgr["dekkingsgraad"][0]
+
+            # last official number
+            df_dgr_fund = self.dekkingsgraden[
+                self.dekkingsgraden["fonds"] == fund]
+            latest_official_dgr_date = max(df_dgr_fund["date"])
+            latest_official_dgr = df_dgr_fund[
+                df_dgr_fund["date"] == latest_official_dgr_date]
+            latest_official_dgr = latest_official_dgr[
+                "dekkingsgraad"].values[0]
+
+            delta_latest_predict = max_predict_dgr - latest_official_dgr
+
+            # ugly, but for now ok. For responsiveness change name to
+            # short "Bouw"
+            if fund == "BPF Bouw":
+                fund_rename = "Bouw"
+            else:
+                fund_rename = fund
+
+            dbcLayout.append(
+                    dbc.Col([
+                        self.topCardLayout(fund_rename,
+                                           max_predict_dgr,
+                                           delta_latest_predict,
+                                           max_predict_date,
+                                           True,
+                                           False),
+                        dbc.Tooltip("{:+.1f}% verschil t.o.v. {}".format(
+                            delta_latest_predict,
+                            latest_official_dgr_date.strftime("%d-%m-%Y")),
+                            target="tooltip-dgr-{}".format(fund_rename))
+                    ])
+            )
+
+        _marketdata = self.marketdata.dropna()
+        dbcMarkets = []
+
+        for market in _marketdata.columns:
+            latest_value = _marketdata[market].iloc[-1:].values[0]
+            max_date = _marketdata.index.max()
+
+            if market in self.rates_indices:
+                latest_delta = _marketdata[market].diff().iloc[-1:].values[0]
+                ratesformat = True
+            else:
+                latest_delta = _marketdata[market].pct_change().iloc[
+                    -1:].values[0] * 100
+                ratesformat = False
+
+            dbcMarkets.append(
+                dbc.Col([
+                    self.topCardLayout(self.marketdatanames[market],
+                                       latest_value,
+                                       latest_delta,
+                                       max_date,
+                                       False,
+                                       ratesformat)
+                ])
+            )
+
+        return dbc.Col([
+            dbc.Row(
+                dbcLayout,
+                no_gutters=True
+            ),
+            dbc.Row(
+                dbcMarkets,
+                no_gutters=True
+            )
+        ])
+
+    def topCardLayout(self,
+                      title: str,
+                      value: float,
+                      change: float,
+                      date,
+                      dgr: bool,
+                      rates: bool) -> dbc.Card:
+        """
+        Make a top (summary) card with the value, delta and date.
+        """
+
+        # determine the color of the delta: green if positive, red if negative
+
+        if change >= 0:
+            fontcolor = "green"
+        else:
+            fontcolor = "red"
+
+        # in case the card is for the dekkingsgraden, make the value a
+        # percentage, otherwise, make the value without percentage sign
+        if dgr:
+            _valueformat = "{:.1f}% "
+            textH = html.H3
+        else:
+            _valueformat = "{:.2f} "
+            textH = html.H5
+
+        if rates:
+            _deltaformat = "{:+.2f}"
+        else:
+            _deltaformat = "{:+.1f}%"
+
+        return dbc.Card([
+            dbc.CardHeader(title),
+            dbc.CardBody([
+                # titleH(title, className="card-title"),
+                textH([
+                    html.Span(_valueformat.format(value)),
+                    html.Span(_deltaformat.format(change),
+                              className="delta-{}".format(title.lower()),
+                              style={"color": fontcolor})
+                ],
+                    className="card-text-{}".format(title.lower())),
+                html.Small("per {}".format(
+                    date.strftime("%d-%m-%Y")),
+                            className="card-small-{}".format(title))
+            ], id="tooltip-dgr-{}".format(title))
+        ])

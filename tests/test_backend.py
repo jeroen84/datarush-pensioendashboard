@@ -6,6 +6,8 @@
 
 # test if DB is filled
 
+# test if pensionfund sites work
+
 # test dependencies
 
 # from tests.conftest import market_data
