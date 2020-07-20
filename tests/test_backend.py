@@ -12,10 +12,12 @@
 
 # from tests.conftest import market_data
 from ..backend.marketdata import EQUITYTICKER, SWAPTICKER, MarketData
+from ..backend.websitesDgr import UpdateDGR
 from dateutil.relativedelta import relativedelta
 from datetime import date
 
 data = MarketData()
+sites = UpdateDGR()
 # number of days in which you can say that the
 # data is 'recent'. Is very arbitrary.
 RECENTDAYS = 3
@@ -58,3 +60,13 @@ def test_iexscraper_equity_available():
             # do you get recent data?
             assert max(df.index) >= date.today() - \
                 relativedelta(days=RECENTDAYS)
+
+
+def test_pensionfundsites():
+    assert sites.abp.empty is False
+
+    assert sites.bouw.empty is False
+
+    assert sites.pfzw.empty is False
+
+    assert sites.pmt.empty is False

@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     # update the risk metrics
     dataimport = DataImport()
-    riskmodel = RiskModelPF(dataimport.df_marketdata, dataimport.df_dgr)
+    riskmodel = RiskModelPF(dataimport.marketdata, dataimport.dekkingsgraden)
     riskmodel.runLinearModel()
     riskmodel.makePrediction()
     riskmodel.makeContribution()

@@ -34,7 +34,7 @@ class UpdateDGR:
                          "BPF Bouw":
                          "https://www.bpfbouw.nl/over-bpfbouw/financiele-"
                          "situatie/overzicht-beleidsdekkingsgraad.aspx",
-                         "PMT": "https://www.bpmt.nl/dekkingsgraden"}
+                         "PMT": "https://www.pmt.nl/dekkingsgraden"}
 
         except Exception as err:
             LOG.error("Unable to load UpdateDGR object: {}".format(err))
@@ -52,25 +52,25 @@ class UpdateDGR:
             # get the latest values from websites
 
             # ABP
-            _df_abp = self.getABP()
+            _df_abp = self.abp
             _maxdatedgrwebsite.update({"ABP": max(_df_abp["date"])})
             _dgrwebsite.update({"ABP": _df_abp[
                 _df_abp["date"] == max(_df_abp["date"])].values[0][2]})
 
             # PFZW
-            _df_pfzw = self.getPFZW()
+            _df_pfzw = self.pfzw
             _maxdatedgrwebsite.update({"PFZW": max(_df_pfzw["date"])})
             _dgrwebsite.update({"PFZW": _df_pfzw[
                 _df_pfzw["date"] == max(_df_pfzw["date"])].values[0][2]})
 
             # Bouw
-            _df_bouw = self.getBouw()
+            _df_bouw = self.bouw
             _maxdatedgrwebsite.update({"BPF Bouw": max(_df_bouw["date"])})
             _dgrwebsite.update({"BPF Bouw": _df_bouw[
                 _df_bouw["date"] == max(_df_bouw["date"])].values[0][2]})
 
             # PMT
-            _df_pmt = self.getPMT()
+            _df_pmt = self.pmt
             _maxdatedgrwebsite.update({"PMT": max(_df_pmt["date"])})
             _dgrwebsite.update({"PMT": _df_pmt[
                 _df_pmt["date"] == max(_df_pmt["date"])].values[0][2]})
@@ -194,32 +194,27 @@ class UpdateDGR:
     def getPMT(self) -> pd.DataFrame:
         try:
             LOG.info("Retrieving latest dekkingsgraad from website PMT")
-            # since PMT does publish the dekkingsgraden as a table,
-            # we need to scrape the values using bs4
-            attrs = {"class": "panel-body accordion-item"}
+            # as of 2020-07-20, PMT does publish its numbers
+            # through a table, which is different than before
 
-            _response = requests.get(self.urls["PMT"])
-            _soup = BeautifulSoup(_response.text, "html.parser")
-            _results = _soup.find_all(name="div", attrs=attrs)
+            _df = pd.read_html(self.urls["PMT"],
+                               header=0)[0]
 
-            # create empty dataframe where we will put the results
-            _df = pd.DataFrame(columns=["date", "name", "value"])
+            # we are not interested in the Beleidsdekkingsgraad
+            _df.drop(columns=["Beleidsdekkingsgraad"], inplace=True)
 
-            index = 0
-            for dgrinfo in _results:
-                # first get the month
-                _df.loc[index, "date"] = dgrinfo.find(name="span",
-                                                      attrs={"class": "month"}
-                                                      ).get_text()
-                _df.loc[index, "name"] = "PMT"
-                # format the percentage string (eg 98,2%) to float
-                # then copy to df
-                _df.loc[index, "value"] = float(
-                    dgrinfo.find(
-                        name="span",
-                        attrs={"class": "data"}
-                        ).get_text().replace(",", ".").rstrip("%")) / 100
-                index += 1
+            # change the percentage value to a floating type
+            _df["Actuele dekkingsgraad"] = _df[
+                "Actuele dekkingsgraad"].str.replace(",", ".")
+            _df["Actuele dekkingsgraad"] = _df[
+                "Actuele dekkingsgraad"].str.rstrip("%").astype(
+                float) / 100
+
+            # now make the format of the df equal to the structure in the db
+            _df["name"] = "PMT"
+            _df.rename(columns={"Maanden": "date",
+                                "Actuele dekkingsgraad": "value"},
+                       inplace=True)
 
             # transform the date values to datetime
             _df = self.transformMonthsToDate(_df)
@@ -278,3 +273,19 @@ class UpdateDGR:
             return _df_return
         except Exception as err:
             LOG.error("transformMonthsToDate restult in error: {}".format(err))
+
+    @property
+    def abp(self):
+        return self.getABP()
+
+    @property
+    def bouw(self):
+        return self.getBouw()
+
+    @property
+    def pfzw(self):
+        return self.getPFZW()
+
+    @property
+    def pmt(self):
+        return self.getPMT()

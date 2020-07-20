@@ -5,3 +5,4 @@ alpha_vantage==2.1.*
 beautifulsoup4==4.8.*
 dateparser==0.7.*
 lxml==4.4.*
+html5lib==1.1.*

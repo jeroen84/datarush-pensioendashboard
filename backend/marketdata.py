@@ -6,7 +6,19 @@ from dateutil.relativedelta import relativedelta
 import logging as LOG
 import os
 from dateparser import parse
-from __init__ import LOGLOCATION, DBCONNECTION
+
+# for some reason, pytest and my python interpretor have
+# inconsistencies in the way the __init__ module should
+# be imported
+try:
+    from .__init__ import LOGLOCATION, DBCONNECTION
+except ImportError:
+    try:
+        from __init__ import LOGLOCATION, DBCONNECTION
+    except Exception as e:
+        LOG.error(
+            "Marketdata.py: Error while importing the __init__: {}".format(e))
+
 
 ALPHAVANTAGE_API = os.environ["ALPHAVANTAGE_API"]
 
