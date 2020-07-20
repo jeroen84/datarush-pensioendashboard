@@ -1,9 +1,12 @@
 import plotly.graph_objects as go
 import dash_core_components as dcc
 from plotly.subplots import make_subplots
+import pandas as pd
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-import pandas as pd
+
+INTERVAL = -6  # months
+STARTDATE = datetime.now() + relativedelta(months=INTERVAL)
 
 LINECOLORS = {"ABP": "indianred",
               "PFZW": "mediumseagreen",
@@ -38,21 +41,15 @@ RANGESELECTOR = dict(
 
 class GraphLibrary:
 
-    def __init__(self):
-        self.dgrgraphs = {}
-        self.equitygraphs = {}
-        self.ratesgraphs = {}
-        self.graphConfig = {"displayModeBar": False}
-
-    def buildGraphs(self,
-                    df_dgr: pd.DataFrame,
-                    df_predict: pd.DataFrame,
-                    df_marketdata: pd.DataFrame,
-                    df_marketdatanames: pd.DataFrame,
-                    df_contribution: pd.DataFrame,
-                    df_countryexposure: pd.DataFrame,
-                    rates_indices: list,
-                    intervals: list):
+    def __init__(self,
+                 df_dgr: pd.DataFrame,
+                 df_predict: pd.DataFrame,
+                 df_marketdata: pd.DataFrame,
+                 df_marketdatanames: pd.DataFrame,
+                 df_contribution: pd.DataFrame,
+                 df_countryexposure: pd.DataFrame,
+                 rates_indices: list,
+                 graphConfig: dict = {"displayModeBar": False}):
         self.df_dgr = df_dgr
         self.df_predict = df_predict
         self.df_marketdata = df_marketdata
@@ -60,62 +57,9 @@ class GraphLibrary:
         self.df_contribution = df_contribution
         self.df_countryexposure = df_countryexposure
         self.rates_indices = rates_indices
-        self.intervals = intervals
+        self.graphConfig = graphConfig
 
-        _today = datetime.now()
-
-        for interval in self.intervals:
-            if interval == "3m":
-                _startdate = _today + relativedelta(months=-3)
-            elif interval == "6m":
-                _startdate = _today + relativedelta(months=-6)
-            elif interval == "1y":
-                _startdate = _today + relativedelta(years=-1)
-            elif interval == "YTD":
-                _startdate = datetime(year=_today.year - 1,
-                                      month=12,
-                                      day=31)
-            elif interval == "all":
-                _startdate = None
-
-            figureDGR = self.buildDGRGraph(_startdate)
-            figureEquity = self.buildEquityGraph(_startdate)
-            figureRates = self.buildRatesGraph(_startdate)
-
-            self.dgrgraphs.update(
-                {interval:
-                    [
-                        dcc.Graph(
-                            figure=figureDGR,
-                            responsive="auto",
-                            config=self.graphConfig
-                            )
-                    ]}
-                )
-
-            self.equitygraphs.update(
-                {interval:
-                    [
-                        dcc.Graph(
-                            figure=figureEquity,
-                            responsive="auto",
-                            config=self.graphConfig
-                            )
-                    ]}
-                )
-
-            self.ratesgraphs.update(
-                {interval:
-                    [
-                        dcc.Graph(
-                            figure=figureRates,
-                            responsive="auto",
-                            config=self.graphConfig
-                            )
-                    ]}
-                )
-
-    def buildDGRGraph(self, start_date=None):
+    def buildDGRGraph(self, start_date=STARTDATE):
 
         fig_dgr = go.Figure()
         hovertemplate = "<b>Datum:</b> %{x}<br><br>" \
@@ -140,7 +84,7 @@ class GraphLibrary:
                                                    color=LINECOLORS[fund]),
                                          name=fund))
 
-            df_predict_fund = self.df_predict[fund]
+            df_predict_fund = self.df_predict[self.df_predict["fund"] == fund]
             # add prediction line
             fig_dgr.add_trace(go.Scatter(x=df_predict_fund.index,
                                          y=df_predict_fund["dekkingsgraad"],
@@ -153,10 +97,13 @@ class GraphLibrary:
         fig_dgr.update_layout(xaxis_rangeslider_visible=False,
                               title="Verloop dekkingsgraden plus prognose",
                               legend_orientation="h")
-        return fig_dgr
+
+        return dcc.Graph(figure=fig_dgr,
+                         responsive="auto",
+                         config=self.graphConfig)
 
     def buildEquityGraph(self,
-                         start_date=None):
+                         start_date=STARTDATE):
         # ----------
         # first filter on start_date
         if start_date is None:
@@ -191,9 +138,12 @@ class GraphLibrary:
         fig_equity.update_layout(xaxis_rangeslider_visible=False,
                                  title="Ontwikkeling aandelen en grondstoffen",
                                  legend_orientation="h")
-        return fig_equity
 
-    def buildRatesGraph(self, start_date=None):
+        return dcc.Graph(figure=fig_equity,
+                         responsive="auto",
+                         config=self.graphConfig)
+
+    def buildRatesGraph(self, start_date=STARTDATE):
         # ----------
         # create market indices graphs (EUSA30 and EURUSD)
         df_rates = self.df_marketdata[self.rates_indices]
@@ -223,7 +173,9 @@ class GraphLibrary:
                                 title_text="Ontwikkeling rente en valuta",
                                 legend_orientation="h")
 
-        return fig_rates
+        return dcc.Graph(figure=fig_rates,
+                         responsive="auto",
+                         config=self.graphConfig)
 
     def buildContributionGraph(self, fund, bin=None):
         fig_contr = make_subplots(specs=[[{"secondary_y": True}]])
@@ -235,17 +187,23 @@ class GraphLibrary:
         hovertemplatepredict = "<b>Datum:</b> %{x}<br><br>" \
                                "<b>Dekkingsgraad:</b> %{y:.1f}%<br>"
 
-        df_contribution_fund = self.df_contribution[fund]
+        df_contribution_fund = self.df_contribution[
+            self.df_contribution["fund"] == fund]
 
         if bin is not None:
             df_contribution_fund = df_contribution_fund.groupby(
-                pd.Grouper(level="date", freq=bin)
+                ["index", pd.Grouper(level="date", freq=bin)]
             ).sum()
 
-        for column in df_contribution_fund.columns:
-            _x = df_contribution_fund.index
-            _y = df_contribution_fund[column]
-            long_name = self.df_marketdatanames[column]
+        for market in df_contribution_fund.index.get_level_values(
+                "index").unique():
+            _x = df_contribution_fund.loc[
+                df_contribution_fund.index.get_level_values("index") == market
+                ].index.get_level_values("date")
+            _y = df_contribution_fund.loc[
+                df_contribution_fund.index.get_level_values("index") == market
+                ]["value"]
+            long_name = self.df_marketdatanames[market]
 
             fig_contr.add_trace(go.Bar(x=_x,
                                        y=_y,
@@ -253,7 +211,7 @@ class GraphLibrary:
                                        name=long_name),
                                 secondary_y=False)
         # add prediction line
-        df_predict_fund = self.df_predict[fund]
+        df_predict_fund = self.df_predict[self.df_predict["fund"] == fund]
 
         # only show the prediction values that are equal to the bins
         if bin is not None:
@@ -262,11 +220,12 @@ class GraphLibrary:
             # last value of the prediction equal to the last date value
             # of the bin
             _idx = df_predict_fund.index.to_list()
-            _idx[-1] = max(df_contribution_fund.index)
+            _idx[-1] = max(df_contribution_fund.index.get_level_values("date"))
             df_predict_fund.index = _idx
 
             df_predict_fund = df_predict_fund[
-                df_predict_fund.index.isin(df_contribution_fund.index)
+                df_predict_fund.index.isin(
+                    df_contribution_fund.index.get_level_values("date"))
             ]
 
         fig_contr.add_trace(go.Scatter(x=df_predict_fund.index,
@@ -297,7 +256,8 @@ class GraphLibrary:
         # inspired by
         # https://plotly.com/python/horizontal-bar-charts/#bar-chart-with-line-plot
 
-        hovertemplate = "Totaal geïnvesteerd in %{y}:<br>EUR %{customdata:,}<br>"
+        hovertemplate = "Totaal geïnvesteerd in %{y}:<br>EUR " \
+            "%{customdata:,}<br>"
 
         df_countryexposure = self.df_countryexposure
 

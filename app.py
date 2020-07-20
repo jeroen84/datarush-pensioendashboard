@@ -4,8 +4,7 @@ import dash_bootstrap_components as dbc
 import dash_html_components as html
 import plotly.io as pio
 from datetime import datetime
-from .dataimport import DataImport
-from .riskmodel import RiskModelPF
+from .backend.dataimport import DataImport
 from .graphs import GraphLibrary
 from newsapi import NewsApiClient
 import os
@@ -15,15 +14,20 @@ from app import app
 pio.templates.default = "plotly_dark"
 
 RATES = ["EUSA30", "EURUSD"]
-TABINTERVALS = ["6m"]
 
 # initiate DataImport and RiskModelPF class
 DATA = DataImport()
-RISKMODEL = RiskModelPF()
 
 # for threadign purposes
 global FIGURES
-FIGURES = GraphLibrary()
+FIGURES = GraphLibrary(
+    DATA.df_dgr,
+    DATA.df_predict,
+    DATA.df_marketdata.dropna(),
+    DATA.df_marketdatanames,
+    DATA.df_contribution,
+    DATA.df_countryexposure,
+    RATES)
 
 # set news api
 NEWSAPI_KEY = os.environ["NEWSAPI_KEY"]
@@ -72,24 +76,6 @@ def buildNewsFeed(topic):
                                             href=item["url"],
                                             target="_blank"))
     return news_items
-
-
-def getMarketData():
-    # run risk model
-    RISKMODEL.runLinearModel(DATA.df_marketdata, DATA.df_dgr)
-    RISKMODEL.makePrediction()
-    RISKMODEL.makeContribution()
-
-    FIGURES.buildGraphs(
-        DATA.df_dgr,
-        RISKMODEL.df_predict,
-        DATA.df_marketdata.dropna(),
-        DATA.df_marketdatanames,
-        RISKMODEL.df_contribution,
-        DATA.df_countryexposure,
-        RATES,
-        TABINTERVALS
-    )
 
 
 def topCardLayout(title: str,
@@ -146,7 +132,7 @@ def buildCardLatestDGR(df_dgr, df_predict):
 
     for fund in df_dgr["fonds"].sort_values().unique():
         # predictions
-        df_predict_fund = df_predict[fund]
+        df_predict_fund = df_predict[df_predict["fund"] == fund]
         max_predict_date = max(df_predict_fund.index)
         max_predict_dgr = df_predict_fund[
             df_predict_fund.index == max_predict_date]
@@ -193,7 +179,8 @@ def buildCardLatestDGR(df_dgr, df_predict):
             latest_delta = _marketdata[market].diff().iloc[-1:].values[0]
             ratesformat = True
         else:
-            latest_delta = _marketdata[market].pct_change().iloc[-1:].values[0] * 100
+            latest_delta = _marketdata[market].pct_change().iloc[-1:].values[
+                0] * 100
             ratesformat = False
 
         dbcMarkets.append(
@@ -236,8 +223,7 @@ aboutcontent = [
         geautomatiseerde omgeving. De broncode is op
         [Github](https://github.com/jeroen84/datarush-pensioendashboard)
         geplaatst!
-        """.format("https://github.com/jeroen84/")
-        ),
+        """),
         dcc.Markdown("""
         Dekkingsgraden worden slechts eenmaal per maand
         gepubliceerd door de fondsen, en pas circa twee
@@ -302,12 +288,9 @@ content = html.Div(id="page-content")
 # --------------
 
 
-@cache.memoize(timeout=CACHE_TIMEOUT)
 def contentoverview():
-    DATA.refreshData()
-    getMarketData()
     latestDGRCards = buildCardLatestDGR(DATA.df_dgr,
-                                        RISKMODEL.df_predict)
+                                        DATA.df_predict)
 
     return html.Div([
         html.P(latestDGRCards),
@@ -324,7 +307,6 @@ def contentoverview():
     ])
 
 
-@cache.memoize(timeout=CACHE_TIMEOUT)
 def contentpensioenfondsen():
     return [
         dbc.Row(
@@ -351,7 +333,8 @@ def contentpensioenfondsen():
                             id="fund-name-dropdown",
                             options=[
                                 {"label": fund, "value": fund}
-                                for fund in RISKMODEL.df_contribution.keys()
+                                for fund in DATA.df_contribution[
+                                    "fund"].sort_values().unique()
                             ],
                             value="ABP",
                             style=dict(color="black")
@@ -398,7 +381,6 @@ def contentpensioenfondsen():
     ]
 
 
-@cache.memoize(timeout=CACHE_TIMEOUT)
 def contentcountries():
     return [
         dbc.Row(
@@ -441,12 +423,11 @@ def contentcountries():
     ]
 
 
-@cache.memoize(timeout=CACHE_TIMEOUT)
 def contenttabs(tab):
     if tab == "tab-dgr":
         return dbc.Row([
             dbc.Col([
-                dbc.Card(dbc.CardBody(FIGURES.dgrgraphs["6m"])),
+                dbc.Card(dbc.CardBody(FIGURES.buildDGRGraph())),
             ],
                 lg=8,
                 md=12
@@ -460,7 +441,7 @@ def contenttabs(tab):
     elif tab == "tab-equity":
         return dbc.Row([
             dbc.Col([
-                dbc.Card(dbc.CardBody(FIGURES.equitygraphs["6m"]))
+                dbc.Card(dbc.CardBody(FIGURES.buildEquityGraph()))
             ],
                 lg=8,
                 md=12
@@ -474,7 +455,7 @@ def contenttabs(tab):
     elif tab == "tab-rates":
         return dbc.Row([
             dbc.Col([
-                dbc.Card(dbc.CardBody(FIGURES.ratesgraphs["6m"]))
+                dbc.Card(dbc.CardBody(FIGURES.buildRatesGraph()))
             ],
                 lg=8,
                 md=12
@@ -490,13 +471,18 @@ def contenttabs(tab):
 # dash_app.config.suppress_callback_exceptions = True
 # define the layout of the dashboard
 # app.title = "Datarush | Pensioendashboard"
-layout = dbc.Container([
-    dcc.Location(id="url"),
-    topbar,
-    html.Hr(),
-    navbar,
-    content
-])
+@cache.memoize(timeout=CACHE_TIMEOUT)
+def serve_layout():
+    return dbc.Container([
+        dcc.Location(id="url"),
+        topbar,
+        html.Hr(),
+        navbar,
+        content
+    ])
+
+
+layout = serve_layout()
 
 
 @app.callback(

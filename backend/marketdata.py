@@ -1,17 +1,12 @@
 import pandas as pd
 import numpy as np
-import sqlite3
 from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.foreignexchange import ForeignExchange
 from dateutil.relativedelta import relativedelta
 import logging as LOG
 import os
-from pathlib import Path
 from dateparser import parse
-
-DIRPATH = Path(os.path.dirname(__file__)).parent
-DBLOCATION = os.path.join(DIRPATH, "db/marketdata.db")
-LOGLOCATION = os.path.join(DIRPATH, "log/backend.log")
+from __init__ import LOGLOCATION, DBCONNECTION
 
 ALPHAVANTAGE_API = os.environ["ALPHAVANTAGE_API"]
 
@@ -49,12 +44,12 @@ LOG.basicConfig(format='%(asctime)s %(message)s',
 
 class MarketData:
 
-    def __init__(self, db=DBLOCATION):
+    def __init__(self):
         try:
             LOG.info("Start MarketData object")
             _query = "SELECT date, name, value FROM marketdata"
-            self.db = db
-            self.conn = sqlite3.connect(self.db)
+
+            self.conn = DBCONNECTION
             self.df_db = pd.read_sql(sql=_query,
                                      con=self.conn,
                                      index_col="date",
