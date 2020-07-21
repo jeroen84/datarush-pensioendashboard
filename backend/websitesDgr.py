@@ -216,6 +216,8 @@ class UpdateDGR:
                                 "Actuele dekkingsgraad": "value"},
                        inplace=True)
 
+            _df = _df[["date", "name", "value"]]
+
             # transform the date values to datetime
             _df = self.transformMonthsToDate(_df)
 

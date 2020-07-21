@@ -394,7 +394,11 @@ class GraphLibrary(DataImport):
                             delta_latest_predict,
                             latest_official_dgr_date.strftime("%d-%m-%Y")),
                             target="tooltip-dgr-{}".format(fund_rename))
-                    ])
+                        ],
+                        md=True,
+                        sm=6,
+                        xs=12
+                    )
             )
 
         _marketdata = self.marketdata.dropna()
@@ -420,7 +424,10 @@ class GraphLibrary(DataImport):
                                        max_date,
                                        False,
                                        ratesformat)
-                ])
+                    ],
+                    md=True,
+                    sm=6,
+                    xs=12)
             )
 
         return dbc.Col([

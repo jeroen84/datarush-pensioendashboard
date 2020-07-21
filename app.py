@@ -30,7 +30,7 @@ cache = Cache(app.server, config={
     "CACHE_TYPE": "filesystem",
     "CACHE_DIR": "cache-directory"
 })
-CACHE_TIMEOUT = 60
+CACHE_TIMEOUT = 600
 cache.clear()
 
 
@@ -222,8 +222,9 @@ def contentpensioenfondsen():
                                 style=dict(color="black")
                             )
                     )
-                ]
-                    )
+                ]),
+                lg=6,
+                md=12
             )
         ],
             no_gutters=True
