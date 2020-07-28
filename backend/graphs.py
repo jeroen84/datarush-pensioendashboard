@@ -90,7 +90,8 @@ class GraphLibrary(DataImport):
                               title="Verloop dekkingsgraden plus prognose",
                               legend_orientation="h")
 
-        return dcc.Graph(figure=fig_dgr,
+        return dcc.Graph(id="fig_dgr",
+                         figure=fig_dgr,
                          responsive="auto",
                          config=self.graphConfig)
 
@@ -131,7 +132,8 @@ class GraphLibrary(DataImport):
                                  title="Ontwikkeling aandelen en grondstoffen",
                                  legend_orientation="h")
 
-        return dcc.Graph(figure=fig_equity,
+        return dcc.Graph(id="fig_equity",
+                         figure=fig_equity,
                          responsive="auto",
                          config=self.graphConfig)
 
@@ -165,7 +167,8 @@ class GraphLibrary(DataImport):
                                 title_text="Ontwikkeling rente en valuta",
                                 legend_orientation="h")
 
-        return dcc.Graph(figure=fig_rates,
+        return dcc.Graph(id="fig_rates",
+                         figure=fig_rates,
                          responsive="auto",
                          config=self.graphConfig)
 
@@ -287,7 +290,7 @@ class GraphLibrary(DataImport):
             # of the plotly graph
             df = df.sort_values(by="value", ascending=True)
 
-            fig.append_trace(go.Bar(
+            fig.add_trace(go.Bar(
                     x=df.percentage,
                     y=df.index,
                     customdata=df.value,

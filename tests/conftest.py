@@ -12,17 +12,19 @@ ENVLOCATION = os.path.join(DIRPATH, ".env")
 
 try:
     load_dotenv(dotenv_path=ENVLOCATION)
+
     print("Succesfully loaded environment variables from {}".format(
         ENVLOCATION))
 except Exception as e:
     print("Error while loading environment variables. "
-         "Might lead to errors furtheron.\n"
-         "Error message: {}".format(e))
+          "Might lead to errors furtheron.\n"
+          "Error message: {}".format(e))
 
 
 def pytest_setup_options():
     options = Options()
-    options.add_argument('--disable-gpu')
-    options.add_argument('--headless')
+    options.add_argument("--disable-gpu")
+    options.add_argument("--headless")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--no-sandbox")
     return options
-

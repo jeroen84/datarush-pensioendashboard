@@ -4,11 +4,22 @@ import dash_bootstrap_components as dbc
 import dash_html_components as html
 import plotly.io as pio
 from datetime import datetime
-from .backend.graphs import GraphLibrary
 from newsapi import NewsApiClient
 import os
 from flask_caching import Cache
-from app import app
+
+# for pytest, a fallback import needs to be
+# defined
+
+try:
+    from .backend.graphs import GraphLibrary
+except ImportError:
+    from backend.graphs import GraphLibrary
+
+try:
+    from app import app
+except ImportError:
+    from Dash.app import app
 
 pio.templates.default = "plotly_dark"
 
@@ -156,9 +167,15 @@ def contentoverview():
     return html.Div([
         html.P(latestDGRCards),
         dbc.CardHeader(dbc.Tabs([
-            dbc.Tab(tab_id="tab-dgr", label="Dekkingsgraden"),
-            dbc.Tab(tab_id="tab-equity", label="Aandelen en grondstoffen"),
-            dbc.Tab(tab_id="tab-rates", label="Rente en valuta")
+            dbc.Tab(id="tab-dgr",
+                    tab_id="tab-dgr",
+                    label="Dekkingsgraden"),
+            dbc.Tab(id="tab-equity",
+                    tab_id="tab-equity",
+                    label="Aandelen en grondstoffen"),
+            dbc.Tab(id="tab-rates",
+                    tab_id="tab-rates",
+                    label="Rente en valuta")
         ],
             id="tabs",
             card=True,
