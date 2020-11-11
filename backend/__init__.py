@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 import logging as LOG
 from datetime import datetime
@@ -24,6 +25,27 @@ def backupDB():
         shutil.copyfile(DBLOCATION, _copylocation)
 
         LOG.info("Succesfully copied db to {}".format(_copylocation))
+
+        # remove oldest backup; in order to save disk space
+        # logic is: remove backups older than 30 days
+        days = 30
+        seconds = days * 24 * 60 * 60
+        now = time.time()
+        backupLocation = os.path.dirname(_copylocation)
+
+        LOG.info("Remove old backups")
+
+        for f in os.listdir(backupLocation):
+            f = os.path.join(backupLocation, f)
+            if os.stat(f).st_mtime < now - seconds:
+                if os.path.isfile(f) and f.endswith(".db"):
+                    if os.path.isfile(f):
+                        os.remove(os.path.join(backupLocation,
+                                  f))
+                        LOG.info(
+                            "Removed old log file {}".format(f)
+                        )
+
     except Exception as err:
         LOG.error("Backing up the db resulted in an error: {}".format(err))
 
