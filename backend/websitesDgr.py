@@ -236,6 +236,9 @@ class UpdateDGR:
             _df = pd.read_html(self.urls["BPF Bouw"],
                                header=0)[0]
 
+            # drop empty rows, which causes errors
+            _df.dropna(inplace=True)
+
             # change the percentage value to a floating type
             _df["Dekkingsgraad"] = _df["Dekkingsgraad"].str.replace(",", ".")
             _df["Dekkingsgraad"] = _df["Dekkingsgraad"].str.rstrip("%").astype(
