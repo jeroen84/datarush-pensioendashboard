@@ -1,0 +1,4 @@
+dash==1.8.0
+plotly_express==0.4.1 # for graphs etc
+dash_bootstrap_components==0.8.1
+flake8 # for linting purposes

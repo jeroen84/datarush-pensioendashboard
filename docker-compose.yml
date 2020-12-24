@@ -1,0 +1,29 @@
+version: "3"
+
+services:
+
+  app:
+    build: .
+    container_name: pensioendashboard
+    restart: unless-stopped
+    env_file: ${PWD}/.env
+    environment:
+      - TZ=Europe/Amsterdam
+    volumes:
+      - ${PWD}/pensioendashboard/db:/app/pensioendashboard/db
+      - ${PWD}/pensioendashboard/log:/app/pensioendashboard/log
+    ports:
+      - "8050:8050"
+    depends_on:
+      - backend
+  
+  backend:
+    build: ./pensioendashboard/backend
+    container_name: pensioenbackend
+    restart: "no"
+    env_file: ${PWD}/.env
+    environment:
+      - TZ=Europe/Amsterdam
+    volumes:
+      - ${PWD}/pensioendashboard/db:/db
+      - ${PWD}/pensioendashboard/log:/log
