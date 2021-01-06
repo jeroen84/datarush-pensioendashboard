@@ -3,29 +3,17 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 import dash_bootstrap_components as dbc
 from pathlib import Path
+from app import app
+from demo1 import app as app1
+from pensioendashboard import app as app2
 
-# for pytest, a fallback import needs to be
-# defined
-try:
-    from app import app
-except ImportError:
-    from .app import app
-
-try:
-    from demo1 import app as app1
-except ImportError:
-    from multiapp.demo1 import app as app1
-
-try:
-    from pensioendashboard import app as app2
-except ImportError:
-    from multiapp.pensioendashboard import app as app2
 
 app.title = "Dashboards by Datarush"
 app.layout = html.Div([
     dcc.Location(id="url", refresh=False),
     html.Div(id="page-content-main")
 ])
+
 
 @app.callback(Output("page-content-main", "children"),
               [Input("url", "pathname")])

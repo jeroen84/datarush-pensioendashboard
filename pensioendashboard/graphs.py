@@ -6,7 +6,7 @@ from plotly.subplots import make_subplots
 import pandas as pd
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from .dataimport import DataImport
+from .backend.dataimport import DataImport
 
 INTERVAL = -6  # months
 STARTDATE = datetime.now() + relativedelta(months=INTERVAL)

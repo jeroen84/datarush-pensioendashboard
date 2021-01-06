@@ -10,16 +10,8 @@ from flask_caching import Cache
 
 # for pytest, a fallback import needs to be
 # defined
-
-try:
-    from .backend.graphs import GraphLibrary
-except ImportError:
-    from backend.graphs import GraphLibrary
-
-try:
-    from app import app
-except ImportError:
-    from multiapp.app import app
+from .graphs import GraphLibrary
+from app import app
 
 pio.templates.default = "plotly_dark"
 
@@ -356,7 +348,6 @@ def contenttabs(tab):
 @cache.memoize(timeout=CACHE_TIMEOUT)
 def serve_layout():
     return dbc.Container([
-        dcc.Location(id="url"),
         topbar,
         html.Hr(),
         navbar,

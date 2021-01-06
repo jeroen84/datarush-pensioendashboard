@@ -4,13 +4,13 @@ FROM python:3.8-slim-buster
 
 WORKDIR /app
 
-COPY pensioendashboard/requirements.txt ./
+COPY requirements.txt ./
 
 RUN pip install -r requirements.txt
 
 COPY pensioendashboard/__init__.py /app/pensioendashboard/
 COPY pensioendashboard/app.py /app/pensioendashboard/
-COPY pensioendashboard/backend/graphs.py /app/pensioendashboard/backend/
+COPY pensioendashboard/graphs.py /app/pensioendashboard/
 COPY pensioendashboard/backend/__init__.py /app/pensioendashboard/backend/
 COPY pensioendashboard/backend/dataimport.py /app/pensioendashboard/backend/
 COPY demo1/__init__.py /app/demo1/
