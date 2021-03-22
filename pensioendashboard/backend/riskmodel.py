@@ -1,7 +1,9 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
-from sklearn import linear_model
+from sklearn.preprocessing import StandardScaler
+from sklearn.compose import TransformedTargetRegressor
+from sklearn.linear_model import LinearRegression
 import logging as LOG
 from __init__ import LOGLOCATION, DBCONNECTION
 from datetime import datetime
@@ -63,6 +65,9 @@ class RiskModelPF:
                     _df_join = _df_dgr.join(_df_marketdata_ffil,
                                             how="left").dropna()
 
+                    # new: only take the last 36 months in the regression
+                    _df_join = _df_join.last("24M")
+
                     # create features and label sets
                     _X = _df_join.drop(columns=fund)
                     _y = _df_join[fund]
@@ -71,8 +76,11 @@ class RiskModelPF:
                     _X_train, _X_test, _y_train, _y_test = \
                         train_test_split(_X, _y)
 
-                    # Create linear regression object
-                    _regr = linear_model.LinearRegression()
+                    # create regression
+                    _regr = TransformedTargetRegressor(
+                        regressor=LinearRegression(),
+                        transformer=StandardScaler()
+                    )
 
                     # Train the model using the training sets
                     _regr.fit(_X_train, _y_train)
@@ -87,8 +95,9 @@ class RiskModelPF:
                         _df_join.index.min(), _df_join.index.max()))
                     LOG.info("Coefficients: {}".format(
                         list(zip(_df_marketdata_ffil.columns,
-                                 _regr.coef_))))
-                    LOG.info("Intercept: {:3f}".format(_regr.intercept_))
+                                 _regr.regressor_.coef_))))
+                    LOG.info("Intercept: {:3f}".format(
+                        _regr.regressor_.intercept_))
                     LOG.info("Coefficient of determination: {:3f}".format(
                         r2_score(_y_test, _y_pred)))
 
@@ -101,7 +110,7 @@ class RiskModelPF:
         except Exception as err:
             LOG.error("runLinearModel results in an error: {}".format(err))
 
-    def makePrediction(self, df_input: pd.DataFrame = None):
+    def makePrediction(self, df_input: pd.DataFrame = None, debug=False):
         # predict using an input df with the
         # 5 (for now) market data risk factors
         # default behavior: predict with data point beyond
@@ -157,10 +166,11 @@ class RiskModelPF:
                     "%Y-%m-%d")
                 # write to db
 
-                _df_predict.to_sql(name="dgr_prediction",
-                                   con=self.conn,
-                                   index=False,
-                                   if_exists="append")
+                if not debug:
+                    _df_predict.to_sql(name="dgr_prediction",
+                                       con=self.conn,
+                                       index=False,
+                                       if_exists="append")
 
                 LOG.info("Succesfully predicted values for {}".format(fund))
                 LOG.info("Predictions are for period {} to {}".format(
@@ -170,7 +180,7 @@ class RiskModelPF:
         except Exception as err:
             LOG.error("makePrediction results in an error: {}".format(err))
 
-    def makeContribution(self, df_input: pd.DataFrame = None):
+    def makeContribution(self, df_input: pd.DataFrame = None, debug=False):
         # predict using an input df with the
         # 5 (for now) market data risk factors
         # default behavior: predict with data point beyond
@@ -246,10 +256,12 @@ class RiskModelPF:
                     value_name="value")
 
                 # write to database
-                _df_predict.to_sql(name="dgr_contribution",
-                                   con=self.conn,
-                                   index=False,
-                                   if_exists="append")
+
+                if not debug:
+                    _df_predict.to_sql(name="dgr_contribution",
+                                       con=self.conn,
+                                       index=False,
+                                       if_exists="append")
 
                 LOG.info("Succesfully written contribution values to "
                          "db for {}".format(fund))
