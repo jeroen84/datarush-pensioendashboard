@@ -12,6 +12,8 @@ LOG.basicConfig(format="%(asctime)s %(message)s",
                 filename=LOGLOCATION,
                 level=LOG.INFO)
 
+ABSCHANGE = "EUSA30"
+
 
 class RiskModelPF:
 
@@ -65,8 +67,16 @@ class RiskModelPF:
                     _df_join = _df_dgr.join(_df_marketdata_ffil,
                                             how="left").dropna()
 
+                    # calculate the pct change, except EUSA30
+                    _df_join[_df_join.columns.difference([ABSCHANGE, fund])] = \
+                        _df_join[
+                            _df_join.columns.difference([ABSCHANGE, fund])
+                            ].pct_change().fillna(0)
+
+                    # for EUSA30, we take the difference
+                    _df_join[[ABSCHANGE, fund]] = _df_join[[ABSCHANGE, fund]].diff().fillna(0)
                     # new: only take the last 36 months in the regression
-                    _df_join = _df_join.last("24M")
+                    # _df_join = _df_join.last("24M")
 
                     # create features and label sets
                     _X = _df_join.drop(columns=fund)
@@ -141,12 +151,30 @@ class RiskModelPF:
 
             for fund in self.regr_model:
                 _df_input = _df_marketdata[
-                    _df_marketdata.index > _df_dgr[fund].dropna().index.max()
+                    _df_marketdata.index >= _df_dgr[fund].dropna().index.max()
                     ]
-                _predict_values = self.regr_model[fund].predict(_df_input)
+
+                # calculate the percentage change based on first observation
+                _df_input.loc[:, _df_input.columns != ABSCHANGE] = \
+                    _df_input.loc[
+                        :, _df_input.columns != ABSCHANGE
+                        ].pct_change().fillna(0) + 1
+
+                _df_input.loc[:, _df_input.columns != ABSCHANGE] = \
+                    _df_input.loc[
+                        :, _df_input.columns != ABSCHANGE].cumprod() - 1
+
+                # for EUSA30, we take the difference based on first observation
+                _df_input[ABSCHANGE] -= _df_input[ABSCHANGE].iloc[0]
+
+                _df_latest = _df_dgr[fund][
+                    _df_dgr[fund].index == _df_dgr[fund].index.max()][0]
+                _predict_values = self.regr_model[fund].predict(_df_input)x
                 _df_predict = pd.DataFrame(data=_predict_values,
                                            index=_df_input.index,
                                            columns={"dekkingsgraad"})
+
+                _df_predict["dekkingsgraad"] += _df_latest
 
                 # add fund name
                 _df_predict["fund"] = fund
@@ -206,8 +234,16 @@ class RiskModelPF:
 
             for fund in self.regr_model:
                 _df_input = _df_marketdata[
-                    _df_marketdata.index > _df_dgr[fund].dropna().index.max()
+                    _df_marketdata.index >= _df_dgr[fund].dropna().index.max()
                     ]
+
+                _df_input[_df_input.columns.difference([ABSCHANGE])] = \
+                    _df_input[
+                        _df_input.columns.difference([ABSCHANGE])
+                        ].pct_change().fillna(0)
+
+                # for EUSA30, we take the difference
+                _df_input[ABSCHANGE] = _df_input[ABSCHANGE].diff().fillna(0)
 
                 _df_input_firstrow = _df_input.iloc[:1]
 
@@ -228,12 +264,14 @@ class RiskModelPF:
                     _df_input_contribution.ffill(inplace=True)
                     _predict = self.regr_model[fund].predict(
                         _df_input_contribution)
-                    _df_predict = _df_predict.merge(right=pd.DataFrame(
-                                                  data=_predict,
-                                                  index=_df_input.index,
-                                                  columns={riskfactor}).diff(
-                                                  ).fillna(0),
-                                                  on="date")
+                    _df_predict_right = pd.DataFrame(
+                        data=_predict + 1,
+                        index=_df_input.index,
+                        columns={riskfactor})
+                    _df_predict_right.cumprod()
+                    _df_predict = _df_predict.merge(
+                        right=_df_predict_right.diff().fillna(0),
+                        on="date")
 
                 # add fund name
                 _df_predict["fund"] = fund
