@@ -68,13 +68,15 @@ class RiskModelPF:
                                             how="left").dropna()
 
                     # calculate the pct change, except EUSA30
-                    _df_join[_df_join.columns.difference([ABSCHANGE, fund])] = \
+                    _df_join[_df_join.columns.difference(
+                        [ABSCHANGE, fund])] = \
                         _df_join[
                             _df_join.columns.difference([ABSCHANGE, fund])
                             ].pct_change().fillna(0)
 
                     # for EUSA30, we take the difference
-                    _df_join[[ABSCHANGE, fund]] = _df_join[[ABSCHANGE, fund]].diff().fillna(0)
+                    _df_join[[ABSCHANGE, fund]] = \
+                        _df_join[[ABSCHANGE, fund]].diff().fillna(0)
                     # new: only take the last 36 months in the regression
                     # _df_join = _df_join.last("24M")
 
@@ -169,7 +171,7 @@ class RiskModelPF:
 
                 _df_latest = _df_dgr[fund][
                     _df_dgr[fund].index == _df_dgr[fund].index.max()][0]
-                _predict_values = self.regr_model[fund].predict(_df_input)x
+                _predict_values = self.regr_model[fund].predict(_df_input)
                 _df_predict = pd.DataFrame(data=_predict_values,
                                            index=_df_input.index,
                                            columns={"dekkingsgraad"})
