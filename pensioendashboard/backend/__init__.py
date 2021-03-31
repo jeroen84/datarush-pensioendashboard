@@ -50,6 +50,28 @@ def backupDB():
         LOG.error("Backing up the db resulted in an error: {}".format(err))
 
 
+def purgeDB():
+    # clean db entries for dgr_prediction and
+    # dgr_contribution older than X months
+    try:
+        _MONTHS = 2
+        _query = [
+            """DELETE FROM dgr_prediction WHERE """
+            """date(date_run) < date("now", "-{} month")""".format(_MONTHS),
+            """DELETE FROM dgr_contribution WHERE date(date_run) """
+            """< date("now", "-{} month")""".format(_MONTHS)
+            ]
+        con = DBCONNECTION.connect()
+
+        for query in _query:
+            con.execute(query)
+
+        con.close()
+
+    except Exception as err:
+        LOG.error("Purging the db resulted in an error: {}".format(err))
+
+
 # this script runs all the backend script in sequence.
 if __name__ == "__main__":
     from marketdata import MarketData
@@ -59,13 +81,14 @@ if __name__ == "__main__":
 
     # first, backup the database
     backupDB()
+    purgeDB()
 
     # update market data
     data = MarketData()
     data.UpdateEquityAndFX()
     data.UpdateInterestRates()
 
-    # # update dekkingsgraad data
+    # update dekkingsgraad data
     update = UpdateDGR()
     update.updateDB()
 
