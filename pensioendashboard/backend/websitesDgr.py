@@ -130,6 +130,8 @@ class UpdateDGR:
 
             # change the percentage value to a floating type
             _df["Dekkingsgraad"] = _df["Dekkingsgraad"].str.replace(",", ".")
+            # remove asterisk
+            _df["Dekkingsgraad"] = _df["Dekkingsgraad"].str.replace("*", "")
             _df["Dekkingsgraad"] = _df["Dekkingsgraad"].str.rstrip("%").astype(
                 float) / 100
 
