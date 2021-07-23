@@ -122,7 +122,7 @@ class MarketData:
             for ticker in SWAPTICKER:
                 _df = self.IEXScraper(ticker, SWAPTICKER[ticker])
 
-                self.ProcessToDB(_df, ticker, pd.DataFrame())
+                self.ProcessToDB(pd.DataFrame(), ticker, _df)
         except Exception as err:
             LOG.error("UpdateInterestRates resulted in an error: {}".format(
                 err))
@@ -142,6 +142,8 @@ class MarketData:
                 _numbermonths = (_today.year * 12) - (_max_date.year * 12) + \
                     _today.month - _max_date.month
 
+                _df_return = pd.DataFrame()
+
                 for x in range(0, _numbermonths+1):
                     # the link requires a "yyymm" extension in order
                     # to get the history of a specific year and month
@@ -151,7 +153,7 @@ class MarketData:
                     _df = pd.read_html(link.format(
                                     _query),
                                     decimal=",",
-                                    thousands=".")[1][["Datum", "Slot"]]
+                                    thousands=".")[0][["Datum", "Slot"]]
 
                     # format the date string to a datetime64 object
                     # using dateparser library
@@ -162,7 +164,9 @@ class MarketData:
                     _df.set_index("date", inplace=True)
                     _df["name"] = ticker
 
-                    return _df
+                    _df_return = _df_return.append(_df)
+
+                return _df_return
             else:
                 return pd.DataFrame()  # empty dataframe if no link is provided
 
@@ -176,13 +180,13 @@ class MarketData:
         # in database (ie missing dates)
         # then write to db the missing date values
         try:
-            if df_source.empty:
+            if df_source.empty and df_fallback.empty:
                 LOG.info("Received no data for ticker "
                          "{}. No data is being processed to DB".format(
                              ticker))
                 return
             else:
-                LOG.info("Succesfully received data "
+                LOG.info("Successfully received data "
                          "for ticker {}".format(ticker))
 
             # Compare with db, and filter what is missing
