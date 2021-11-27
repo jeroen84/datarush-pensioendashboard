@@ -170,7 +170,7 @@ class RiskModelPF:
                 _df_input[ABSCHANGE] -= _df_input[ABSCHANGE].iloc[0]
 
                 _df_latest = _df_dgr[fund][
-                    _df_dgr[fund].index == _df_dgr[fund].index.max()][0]
+                    _df_dgr[fund].index == _df_dgr[fund].dropna().index.max()][0]
                 _predict_values = self.regr_model[fund].predict(_df_input)
                 _df_predict = pd.DataFrame(data=_predict_values,
                                            index=_df_input.index,
