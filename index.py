@@ -1,5 +1,4 @@
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc, html
 from dash.dependencies import Input, Output
 import dash_bootstrap_components as dbc
 from pathlib import Path
@@ -23,7 +22,7 @@ def display_page(pathname):
 
         if len(p.parts) == 1:
             # this means at "/" level:
-            return dbc.Jumbotron([
+            return dbc.Col([
                 dcc.Markdown("# Welcome"),
                 html.Hr(),
                 dcc.Markdown("Please go to one of the dashboards "

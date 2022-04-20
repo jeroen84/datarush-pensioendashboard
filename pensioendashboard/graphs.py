@@ -1,7 +1,6 @@
 import plotly.graph_objects as go
-import dash_core_components as dcc
+from dash import dcc, html
 import dash_bootstrap_components as dbc
-import dash_html_components as html
 from plotly.subplots import make_subplots
 import pandas as pd
 from datetime import datetime
@@ -436,11 +435,11 @@ class GraphLibrary(DataImport):
         return dbc.Col([
             dbc.Row(
                 dbcLayout,
-                no_gutters=True
+                className="g-0"
             ),
             dbc.Row(
                 dbcMarkets,
-                no_gutters=True
+                className="g-0"
             )
         ])
 

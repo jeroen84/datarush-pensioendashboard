@@ -1,7 +1,6 @@
 from dash.dependencies import Input, Output
-import dash_core_components as dcc
+from dash import dcc, html
 import dash_bootstrap_components as dbc
-import dash_html_components as html
 import plotly.io as pio
 from datetime import datetime
 from newsapi import NewsApiClient
@@ -57,7 +56,7 @@ def getNews():
 
 def buildNewsFeed(topic):
     results = getNews()[topic]
-    news_items = [dbc.ListGroupItemHeading("Laatste nieuws [{}]".format(
+    news_items = [dbc.ListGroupItem("Laatste nieuws [{}]".format(
         datetime.now().strftime("%H:%M:%S")
         ))]
     for item in results["articles"]:
@@ -170,7 +169,6 @@ def contentoverview():
                     label="Rente en valuta")
         ],
             id="tabs",
-            card=True,
             active_tab="tab-dgr"),
         ),
         html.Div(id="content")
@@ -236,7 +234,7 @@ def contentpensioenfondsen():
                 md=12
             )
         ],
-            no_gutters=True
+            className="g-0"
         ),
         dbc.Row(
             dbc.Col(
@@ -379,9 +377,9 @@ def render_page_content(pathname):
     elif pathname == "{}/page-3".format(BASEPATH):
         return contentcountries()
     elif pathname == "{}/page-4".format(BASEPATH):
-        return dbc.Jumbotron(aboutcontent)
+        return dbc.Col(aboutcontent)
     # If the user tries to reach a different page, return a 404 message
-    return dbc.Jumbotron(
+    return dbc.Col(
         [
             html.H1("404: Not found", className="text-danger"),
             html.Hr(),
